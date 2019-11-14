@@ -1,0 +1,5 @@
+\usepackage[portuguese]{babel}
+\newcommand{\mychapterbabel}{Capítulo}
+\newcommand{\mypagebabel}{página}
+\newcommand{\myfigurebabel}{figura}
+\newcommand{\mylangbabel}{portuguese}

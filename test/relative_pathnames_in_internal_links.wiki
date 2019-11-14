@@ -1,0 +1,23 @@
+
+
+dhunparserurl Benutzer:Dirk_Huenniger/play
+
+The content of chapter 1 is given in [[../play2|A nice link]] and the content of chapter 2 is given in [[../play3|another link]]
+
+= Chapter 1 =
+
+dhunparserlookaheadbreak
+
+
+dhunparserurl Benutzer:Dirk Huenniger/play2
+
+chapter 1 content
+
+= Chapter 2 =
+
+dhunparserlookaheadbreak
+
+
+dhunparserurl Benutzer:Dirk Huenniger/play3
+
+chapter 2 content

@@ -1,0 +1,5 @@
+\usepackage[russian]{babel}
+\newcommand{\mychapterbabel}{Глава}
+\newcommand{\mypagebabel}{страница}
+\newcommand{\myfigurebabel}{рисунок}
+\newcommand{\mylangbabel}{russian}

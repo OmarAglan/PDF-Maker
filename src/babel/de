@@ -1,0 +1,6 @@
+\HyphSubstLet{ngerman}{ngerman-x-latest}
+\usepackage[ngerman]{babel}
+\newcommand{\mychapterbabel}{Kapitel}
+\newcommand{\mypagebabel}{auf Seite}
+\newcommand{\myfigurebabel}{Abb.}
+\newcommand{\mylangbabel}{ngerman}

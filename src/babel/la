@@ -1,0 +1,5 @@
+\usepackage[latin]{babel}
+\newcommand{\mychapterbabel}{Capitulum}
+\newcommand{\mypagebabel}{on page}
+\newcommand{\myfigurebabel}{Figure}
+\newcommand{\mylangbabel}{latin}

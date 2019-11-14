@@ -1,0 +1,30 @@
+
+
+dhunparserurl Benutzer:Dirk_Huenniger/play
+
+
+
+dhunparserurl Benutzer:Dirk_Huenniger/play
+
+{|  cellpadding="4" cellspacing="0" style="margin: 1em 1em 1em 0; background: #f9f9f9; border: 1px #a0a0a0 solid; border-collapse: collapse; "  rules="all" 
+| sad
+|-
+|
+{|  cellpadding="4" cellspacing="0" style="margin: 1em 1em 1em 0; background: #f9f9f9; border: 1px #a0a0a0 solid; border-collapse: collapse; "  rules="all" 
+|
+*a
+*b
+|-
+|
+:a
+:b
+|-
+|
+#a
+#b
+|-
+|
+;a:b
+;x:y
+|}
+|}

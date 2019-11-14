@@ -1,0 +1,5 @@
+\usepackage[finnish]{babel}
+\newcommand{\mychapterbabel}{Chapter}
+\newcommand{\mypagebabel}{sivu}
+\newcommand{\myfigurebabel}{kuva}
+\newcommand{\mylangbabel}{finnish}

@@ -1,0 +1,43 @@
+\RequirePackage{hyphsubst}
+\documentclass[fontsize=11pt,paper=A4,BCOR=12mm,DIV=13,open=any,listof=totoc]{scrbook}
+\input{../headers/paper}
+\input{../headers/packages1}
+\input{../headers/babel}
+\input{../headers/svg}
+\input{../headers/packages2}
+\input{../headers/defaultcolors}
+\input{../headers/hyphenation}
+\input{../headers/commands}
+\input{../headers/title}
+\input{../headers/options}
+\input{../headers/formattings}
+\input{../headers/unicodes}
+\input{../headers/templates}
+\input{../headers/templates-dirk}
+\input{../headers/templates-chemie}
+
+\usepackage{type1ec}      
+\usepackage{xltxtra}
+\usepackage{fontspec}
+\usepackage{varwidth}
+\setmainfont[
+ 	UprightFont=FreeSerif,
+ 	BoldFont=FreeSerifBold,
+ 	ItalicFont=FreeSerifItalic,
+ 	BoldItalicFont=FreeSerifItalic,
+        ]{FreeSerif} 
+
+\setmonofont[
+ 	UprightFont=FreeMono,
+ 	BoldFont=FreeMonoBold,
+ 	ItalicFont=FreeMonoOblique,
+ 	BoldItalicFont=FreeMonoBoldOblique
+        ]{FreeMono}
+
+
+\begin{document}
+\thispagestyle{empty}
+\newsavebox{\mybox}
+\sbox{\mybox}{
+
+

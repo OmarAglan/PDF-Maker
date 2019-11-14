@@ -1,0 +1,150 @@
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.\" Mediawiki2LaTeX man page.
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.ds appname MediaWiki to LaTeX
+.ds cmdname mediawiki2latex
+.ds manname MEDIAWIKI2LATEX
+.ds version MEDIAWIKI2LATEXVERSION
+.ds year 2013
+.ds date \*[year]-12-25
+.ds appauthors Dirk Hünniger <dirk.hunniger@googlemail.com>
+.ds manauthors Pierre Neidhardt <ambrevar@gmail.com>
+.
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.TH \*[manname] 1 "\*[date]" "\*[appname] \*[version]" "User Commands"
+.
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.SH NAME
+\*[appname] - compile MediaWiki pages via LaTeX to PDF
+.
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.SH SYNOPSIS
+.
+.SY \*[cmdname]
+.RI  [ OPTION ] "" " -o " FILE " -u " URL
+.YS
+.
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.SH DESCRIPTION
+\*[appname] will fetch MediaWiki pages from a URL. It will fetch all its content
+recursively, i.e. subpages and pictures. Then the source code is converted to
+LaTeX, using the user template
+.I MAP
+if specified, or a default template otherwise.  The LaTeX output is stored in
+.I LATEXTREE
+if provided. Finally a PDF if generated from the LaTeX source code if an
+appropriate LaTeX compiler is found. Note that it will automatically run several
+times to make sure all references are resolved.
+.
+All steps can be controlled with command-line options.
+.
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.SH OPTIONS
+.TP
+.BR -c ", " --copy = \fILATEXTREE\fR
+Write all generated LaTeX files to the specified folder.
+.TP
+.BR -g ", " --vector
+Keep vector graphics in vector form.
+.TP
+.BR -h ", " --html
+Use mediaWiki generated HTML as input (default).
+.TP
+.BR -z ", " --zip
+Output LaTeX Source Archive.
+.TP
+.BR -b ", " --epub
+Output epub file.
+.TP
+.BR -d ", " --odt
+Output odt file. Open Document Text (for wordprocessors)
+.TP
+.BR -i ", " --internal
+Use internal template definitions.
+.TP
+.BR -x ", " --hex = \fICONFIG\fR
+Take configuration data from hex encoded string given on the command line. This is only needed to avoid malicious shell injecion via the web form of the server
+.TP
+.BR -m ", " --mediawiki
+Use mediaWiki to expand the templates.
+.TP
+.BR -k ", " --bookmode
+Use book-namespace mode for expansion. That means: Follow all links but not recursively.
+.TP
+.BR -o ", " --output = \fIFILE\fR
+Specify the PDF output file.
+.TP
+.BR -p ", " --paper = \fISIZE\fR
+Set the paper size. Possible values are \fIA4\fR, \fIA5\fR, \fIB5\fR, \fIletter\fR, \fIlegal\fR, \fIexecutive\fR.
+.TP
+.BR -r ", " --resolution = \fIDPI\fR
+Set the maximum image reolution in dot-per-inch. The argument should be an integer.
+.TP
+.BR -s ", " --server = \fIPORT\fR
+Run as server. Listen on PORT
+.TP
+.BR -t ", " --templates = \fIMAP\fR
+Specify the user template map file. Usually called templates.user.
+.TP
+.BR -l ", " --headers = \fHEADERSPATH\fR
+The the path to the LaTeX headers, which should be used. May be omitted. Useful in combination -t.
+.TP
+.BR -u ", " --url = \fIURL\fR
+The input URI. It should point to a MediaWiki page.
+.TP
+.BR -? ", " -v ", " --version ", " --help
+Show help options together with version number.
+.
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.SH TEMPLATES
+MediaWiki features a powerful template system which will control the appearance
+of specific parts in the text. This system can be used to our advantage to
+further control the appearance of the resulting PDF. You can tell MediaWiki to
+LaTeX to use the host site template result directly in the PDF, or you can use a
+custom template of yours. See the \fI$XDG_DATA_DIRS/mediawiki2latex/latex\fR for
+a template example.
+.
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.SH LATEX TREE
+All the downloaded files are kept into memory, so there will not be any
+MediaWiki files remaining on disk after the process. However, the generated
+LaTeX files -- the `LaTeX tree' -- need to be written on disk in order to produce
+the PDF. These files are written to \fI/tmp/MediaWiki$$\fR by default. This
+folder will be removed when the program exits.
+.P
+However you may want to keep the generated LaTeX tree on disk for LaTeX
+customiwation and to fasten future builds. If you use the \fB-c\fR option to set
+the LaTeX tree folder, the program will not remove it on exit so you can
+continue to use it.
+.
+.TP
+The LaTeX tree is made of three folders:
+.TP
+.I header
+A folder containing the LaTeX options, the special pages, the package loading,
+etc.
+.TP
+.I images
+All the original picture files used in the article.
+.TP
+.I main
+The complete LaTeX version of the source document is stored in \fImain.tex\fR.
+.P
+To compile the PDF file yourself, simply run `xelatex' on the \fImain.tex\fR
+file. For instance:
+.IP
+.EX
+xelatex LaTeX-tree/main/main.tex
+.EE
+.P
+You may need to run it several times to make sure all references are resolved.
+.
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.SH AUTHORS
+\*[appname] was mainly developed by \*[appauthors]. Other contributors are
+listed in the
+.I AUTHORS
+file.
+.
+.P
+This man page was written by \*[manauthors].

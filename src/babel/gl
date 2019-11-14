@@ -1,0 +1,5 @@
+\usepackage[galician]{babel}
+\newcommand{\mychapterbabel}{Chapter}
+\newcommand{\mypagebabel}{páxina}
+\newcommand{\myfigurebabel}{Figure}
+\newcommand{\mylangbabel}{galician}

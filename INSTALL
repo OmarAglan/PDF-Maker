@@ -1,0 +1,97 @@
+================================================================================
+Requirements
+================================================================================
+
+Compile-time dependencies:
+  cabal
+  ghc
+
+Runtime TeX dependencies:
+  amscls
+  amsmath
+  babel
+  bbding
+  bbm-macros
+  colortbl
+  ec
+  euenc
+  fancyvrb
+  fontspec
+  fourier
+  framed
+  graphics
+  helvetic
+  hyperref
+  kastrup
+  keystroke
+  koma-script
+  l3kernel
+  l3packages
+  latex
+  latexconfig
+  latex-fonts
+  lm
+  marvosym
+  mdwtools
+  metalogo
+  ms
+  multirow
+  oberdiek
+  paralist
+  parskip
+  psnfss
+  realscripts
+  rsfs
+  skull
+  symbol
+  times
+  tipa
+  tools
+  ulem
+  url
+  wasy
+  wasysym
+  xcolor
+  xetex
+  xetexconfig
+  xetex-def
+  xltxtra
+  xunicode
+  zapfding
+
+================================================================================
+Compilation on Linux
+================================================================================
+
+Switch to the source folder and run
+
+  $ make
+  $ make install
+
+or
+
+  $ make deps
+
+You can change the installation destination with the PREFIX variable (/usr/local
+by default).
+
+ $ make PREFIX=/usr install
+
+
+================================================================================
+Compilation on Win64
+================================================================================
+
+Install "The Haskell Platform" first
+
+Switch to the source folder and run
+
+  cabal install
+  #this will fail but it will correcty install the build dependencies
+  cd src
+  ghc --make mediawiki2latex
+
+Download the MediaWikiToLaTeX.zip file from the sourceforge site. Install the file mediawiki2latex.exe you just readed into the directory trunk/bin. Change directroy to that folder an run from there. The program have got runtime depencies to pdflatex and so on with are given as
+relative pathnames based on trunk/bin.
+
+

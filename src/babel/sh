@@ -1,0 +1,5 @@
+\usepackage[serbo-croatian]{babel}
+\newcommand{\mychapterbabel}{Chapter}
+\newcommand{\mypagebabel}{on page}
+\newcommand{\myfigurebabel}{Figure}
+\newcommand{\mylangbabel}{serbo-croatian}

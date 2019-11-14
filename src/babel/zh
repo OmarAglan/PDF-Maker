@@ -1,0 +1,7 @@
+\HyphSubstLet{ngerman}{ngerman-x-latest}
+\usepackage{xeCJK}
+\setCJKmainfont{WenQuanYi Zen Hei}
+\newcommand{\mychapterbabel}{章}
+\newcommand{\mypagebabel}{页}
+\newcommand{\myfigurebabel}{图形}
+\newcommand{\mylangbabel}{chinese}

@@ -1,0 +1,5 @@
+\usepackage[tajik]{babel}
+\newcommand{\mychapterbabel}{Chapter}
+\newcommand{\mypagebabel}{сафҳа}
+\newcommand{\myfigurebabel}{Figure}
+\newcommand{\mylangbabel}{tajik}

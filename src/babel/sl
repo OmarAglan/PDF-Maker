@@ -1,0 +1,5 @@
+\usepackage[slovenian]{babel}
+\newcommand{\mychapterbabel}{Chapter}
+\newcommand{\mypagebabel}{strani}
+\newcommand{\myfigurebabel}{Figure}
+\newcommand{\mylangbabel}{slovenian}

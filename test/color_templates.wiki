@@ -1,0 +1,12 @@
+
+
+dhunparserurl Benutzer:Dirk_Huenniger/play
+
+
+{{blau|Beispieltext}}
+
+{{rot|Beispieltext}}
+
+{{grün|'''Beispieltext'''}}
+
+{{bg|yellow|Beispieltext}}

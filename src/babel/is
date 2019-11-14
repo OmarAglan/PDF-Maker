@@ -1,0 +1,5 @@
+\usepackage[icelandic]{babel}
+\newcommand{\mychapterbabel}{Kafli}
+\newcommand{\mypagebabel}{on page}
+\newcommand{\myfigurebabel}{Figure}
+\newcommand{\mylangbabel}{icelandic}

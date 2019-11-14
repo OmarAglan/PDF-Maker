@@ -1,0 +1,178 @@
+Version 7.37
+	* src
+        the bug introduced in 7.36 that caused the list of contributors to be 
+        incomplete was fixed. a new faster but less memory efficient parser
+        is used to extract the list of contributors from the history pages on
+        the wiki. The same applies to the list of figures. This causes 
+        mediawiki2latex to run roughly 30% faster altogether.  
+Version 7.36
+	* src
+        let a be the fact that mediawiki2latex is asked to gernerate a PDF file
+        or a zip file with the corresponding latex source (which is equivalent
+        to the fact that neigther of the options -b, -d, --epub, --odt 
+        are present).
+        let b be the fact that the input is a book or collection (which 
+        is equivalent to the fact that -k or --bookmode command line option is present).
+        if both a and b a are true then the memory consumption is reduced by usually at least an
+        order of magnitue. This is why the server now supports up to four requests in parallel
+        and up to four hours per request.
+Version 7.35
+	* src
+        table column precompilation now happens in a single LaTeX run. This increases speed. 
+        Server can run bookmode again. Formulars inside captions of images galleries
+        work now. Navboxes are now displayed collapsed. Support for "track" hmtl tag.
+        Support von "source" tag with empty string inside. Links to cateories not 
+        displayed anymore. 
+Version 7.34
+	* src
+        memory consumption with -k signifikantly reduced due to exchange of serialization library
+	message displayed in server mode which points users where to look for the downloaded files
+        some fixes that allows use with edutech wiki from the univeristy of Geneva
+        the following combinations of parameters are now also possible -k -m as well as -k -i as well as -k -t
+        -k works with -b. The combination of -k -d is bascially possible but might fail due to a bug in 
+        libreoffice at large documents
+Version 7.33
+	* src
+	amperand and "<" and ">" now work in sourcecode received via html
+        some more toplevel function are now documented
+        server now displayes running at wmflabs
+        server now warns about time limit of one hour
+        formulas inside image caption received of html work
+        man page update
+        source code pretty printed
+Version 7.32
+	* src
+	tables now work with formulas inside them also
+        webserver now links to installation instructions
+Version 7.31
+	* src
+	tables now work again and superfloues mediawiki internal html elements removed
+Version 7.30
+	* src
+	making it compile on debian buster
+Version 7.29
+	* src
+	making server mode work again
+Version 7.28
+	* src
+	wikipedia "Book" namespace mode added. ram usage optimized in this mode 
+Version 7.27
+	* src
+	xelatex compiler change, ttf file extension no more written out 
+Version 7.26
+	* src
+	added two new output formats: epub and odt
+Version 7.25
+	* src
+	replaced deprecated call to parseUrl by call to parseRequest
+Version 7.24
+	* src
+	bdi tags in list of figures as well as contributors removed
+Version 7.23
+	* src
+	German Wikibook Mathe für nicht Freaks does compile now. 
+	Formulas now work with Wikipedias new mathml markup.
+Version 7.22
+	* src
+	English Bourne Shell Wikiboook and German Wikibook on complex
+	numbers do compile now
+Version 7.21
+	* src
+	Wikipedia does now only allow https but no more https. This bug was fixed with this release.
+	Now mediawiki2latex only uses https request but does not support http anymore
+Version 7.20
+	* src
+	mediawiki changed its html output concerning internal links. This caused a bug
+	in mediawiki2latex causing wrong display of links in the pdf and latex
+	documents generated. This bug has been fixed
+Version 7.19
+	* src
+	server mode website now W3C validated HTML5. font scaling for tables which would not
+	fit on a page otherwise optimized. superfluses values, needed only internaly for 
+        sorting in normal webbrowsers, in sortable tables removed accoriding to 
+        span style dispaly none
+Version 7.18
+	* src
+	tables optimized. scalefactor for width correction by spacing between column is not back to normal
+	again. At most two columns of a table may be wraped, the fontssize of the table is reduced 
+	otherwise now. Tables with contain nested tables are now always typeset in landscape mode 
+Version 7.17
+	* src
+	avoid problems with limits on the number of handels on stderr and stdout streams
+	of subprocesses.
+Version 7.16
+	* src
+	some templates for german wikibooks have been added
+	the maximum number of treads has been limited to 200 in order to
+	avoid problems with limits on the number of file and socket handles.
+Version 7.15
+	* src
+	on linux the maximum length of a line in a latex document has been increased
+	chars outside 16 bit unicode range are using font for space character
+	test on 2700 features articles on the english wikipedia resulted in only one 
+	failiure namely Chess
+Version 7.14
+	* src
+	server properly reads subprocess pipes now, so the don't overrun anymore
+	varwidth environments now properly closed when doing latex runs to calculate
+	optimized column width
+	stub for selftesting added but no functionally implemented yet          
+Version 7.13
+	* src
+	Webserver now does time out if processing takes to long
+	Article on New Jouralsim compiles aganin
+	This solved by packing table cell in varwidth minipages for column width calculation
+	html fallback. If a server does not seem to be running mediawiki html is processes as fallback
+Version 7.12
+	* src
+        Web server got a professionally looking web interface new
+	Formulas on the German Wikipedia work again
+Version 7.11
+	* src
+        progress strings are now printed to allow precise progress indication
+Version 7.10 
+	* src
+        alternative LaTeX headers can be supplied by the user
+Version 7.5
+	* src
+        books can now have an index
+Version 7.4
+	* src
+        -c command line option also on Windows
+        use of more that one cpus core by runtime system enabled
+Version 7.3
+	* src
+	Using multiple OS threads. Speedup by a faktor of two due to IO parallelism
+Version 7.2
+	* src
+        images and list of figures works for even more non wikimedia wikis
+        fonts now switched during latex run so full 16 bit unicode support on debian included
+        server added
+Version 7.1
+	* src
+	mediawiki urls in default configuration, that is with index.php in between work
+	relative pathnames for -c command line option work
+	gui added
+	table of contents is only procuded once per document
+Version 6.6
+	* src
+        Added command line option for using megafont ttf files if requested
+Version 6.5
+	* Makefile:
+	A lot of improvements int the building process. Should be easily
+	packageable now.
+	Using 'install' instead of 'cp' to make sure file access is right.
+	Generate man page.
+
+	* mediawiki2latex.1:
+	Completed man page.
+
+	* INSTALL:
+	Listed most dependencies. Needs to be polished.
+
+	* .:
+	Removed useless files and folders.
+	Removed backup files.
+
+Version 6.4
+	...

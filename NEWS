@@ -1,0 +1,5 @@
+As of Appril 2014, the issues caused by the major rewrite have been reoslved:
+
+* There is a GUI again.
+* Fonts are switched during the LaTeX run such that full 16 bit Unicode is supported again.
+* The are releases for Windows again.

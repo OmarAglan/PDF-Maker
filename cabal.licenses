@@ -1,0 +1,31 @@
+Checking from
+http://packdeps.haskellers.com/licenses
+
+bytestring  BSD3
+process     BSD3
+temporary   BSD3
+file-embed  BSD3
+url         BSD3
+hxt-http    states BDS3 and MIT and Other License
+  where Other License for
+    hxt-charproperties hxt-unicode
+  but inspecition of the file LICENSE shipped with each of them shows that it is litral MIT.
+    As found here http://de.wikipedia.org/wiki/MIT-Lizenz
+
+hxt same as hxt-http
+utf8-string        BSD3
+parsec             BSD3
+HTTP               BDS3
+regex-compat       BSD3
+split              BSD3
+containers         BSD3
+base               BSD3
+highlighting-kate  BSD3 GPL
+utility-ht         BSD3
+transformers       BSD3
+directory          BSD3
+blaze-html         BSD3
+mtl                BSD3
+regex-pcre-builtin BSD3
+network            BSD3
+curl               BSD3

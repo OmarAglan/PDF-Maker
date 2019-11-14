@@ -1,0 +1,5 @@
+\usepackage[swahili]{babel}
+\newcommand{\mychapterbabel}{Sura}
+\newcommand{\mypagebabel}{ukurasa}
+\newcommand{\myfigurebabel}{Figure}
+\newcommand{\mylangbabel}{swahili}

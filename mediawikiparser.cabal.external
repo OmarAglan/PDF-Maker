@@ -1,0 +1,47 @@
+Name:           mediawikiparser
+Version:        1.0
+License:        GPL
+License-File:   LICENSE
+Author:         Dirk Hünniger <dirk.hunniger@googlemail.com>
+Maintainer:     Dirk Hünniger <dirk.hunniger@googlemail.com>
+Homepage:       http://sourceforge.net/projects/wb2pdf/
+Category:       Text
+Synopsis:       Parse MediaWiki
+Description:
+   a parser for mediawiki  
+Stability:      Experimental
+Tested-With:    GHC==6.12.3
+Tested-With:    GHC==7.4.1
+Cabal-Version:  >=1.6
+Build-Type:     Simple
+
+Source-Repository head
+  Type: git
+  Location: git://git.code.sf.net/p/wb2pdf/git
+
+library
+  hs-source-dirs:   src
+  exposed-modules:
+    Text.ParserMediaWiki
+  build-depends:
+      utf8-string >=0.3.6 ,
+      utility-ht >=0.0.5 ,
+      split >=0.1.2.3 ,
+      text,
+      containers >=0.3 ,
+      network >= 2.3.0.13 ,
+      parsec >=2.1 ,
+      base >= 4 && <= 5
+
+  Other-Modules:
+    MagicStrings
+    MediaWikiParseTree
+    MediaWikiParser
+    Tools
+
+  GHC-Options:    -Wall -O2  -rtsopts "-with-rtsopts=-K100M -N" -threaded 
+  Hs-Source-Dirs: src
+
+
+
+

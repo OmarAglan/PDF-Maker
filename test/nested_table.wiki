@@ -1,0 +1,18 @@
+
+
+dhunparserurl Benutzer:Dirk_Huenniger/play
+
+
+{| 
+| 
+{| 
+| a || b
+|-
+| c || d
+|}  
+| 2
+|-
+| 3
+| 4
+
+|}

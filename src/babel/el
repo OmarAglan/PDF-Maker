@@ -1,0 +1,5 @@
+\usepackage[greek]{babel}
+\newcommand{\mychapterbabel}{Κεφάλαιο}
+\newcommand{\mypagebabel}{σελίδα}
+\newcommand{\myfigurebabel}{Figure}
+\newcommand{\mylangbabel}{greek}

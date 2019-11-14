@@ -1,0 +1,5 @@
+\usepackage[italian]{babel}
+\newcommand{\mychapterbabel}{Capitolo}
+\newcommand{\mypagebabel}{pagina}
+\newcommand{\myfigurebabel}{figura}
+\newcommand{\mylangbabel}{italian}

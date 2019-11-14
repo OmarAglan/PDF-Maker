@@ -1,0 +1,17 @@
+Authors:
+    Dirk Hünniger <hunniger@cip.physik.uni-bonn.de>
+
+Contributors:
+    Daniel Mlot
+    Pierre Neidhardt <ambrevar@gmail.com>
+    Henning Thielemann
+    Jürgen Thomas
+
+This project is based on the wiki2pdf project by Stephan Walter. 
+The original wiki2pdf code was written by
+    Stephan Walter <stephan.walter@epfl.ch>
+    Forest Timothy Gregg <fgregg@cs.uchicago.edu>
+    Lexor <lexorpedia@myway.com>
+    Andi Albrecht <andialbrecht@web.de>
+but nothing of their code is still present in the current version, since the
+program was rewritten in Haskell using entirely different algorithms.

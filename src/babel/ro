@@ -1,0 +1,5 @@
+\usepackage[romanian]{babel}
+\newcommand{\mychapterbabel}{Chapter}
+\newcommand{\mypagebabel}{pagină}
+\newcommand{\myfigurebabel}{Figure}
+\newcommand{\mylangbabel}{romanian}

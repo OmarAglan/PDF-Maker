@@ -1,0 +1,5 @@
+\usepackage[french]{babel}
+\newcommand{\mychapterbabel}{Chapitre}
+\newcommand{\mypagebabel}{page}
+\newcommand{\myfigurebabel}{FIGURE}
+\newcommand{\mylangbabel}{french}

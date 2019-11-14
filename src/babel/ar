@@ -1,0 +1,5 @@
+\usepackage[arabic]{babel}
+\newcommand{\mychapterbabel}{فصل}
+\newcommand{\mypagebabel}{صفحة}
+\newcommand{\myfigurebabel}{Figure}
+\newcommand{\mylangbabel}{arabic}

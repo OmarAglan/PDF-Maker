@@ -1,0 +1,5 @@
+\usepackage[hungarian]{babel}
+\newcommand{\mychapterbabel}{Fejezet}
+\newcommand{\mypagebabel}{lap}
+\newcommand{\myfigurebabel}{Figure}
+\newcommand{\mylangbabel}{hungarian}

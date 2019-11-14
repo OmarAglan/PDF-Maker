@@ -1,0 +1,5 @@
+\usepackage[afrikaans]{babel}
+\newcommand{\mychapterbabel}{Chapter}
+\newcommand{\mypagebabel}{bladsy}
+\newcommand{\myfigurebabel}{Figure}
+\newcommand{\mylangbabel}{afrikaans}
