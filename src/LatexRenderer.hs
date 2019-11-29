@@ -1762,7 +1762,7 @@ templateProcessor st ("java", ll) = (st, mainer)
         code = trilex st{getInCode = True} ll
 templateProcessor st ("DOI", ll)
   = (st,
-     "DOI:\\myhref{http://dx.doi.org/" ++ tl ++ "}{" ++ tx ++ "}")
+     "DOI:\\myhref{https://doi.org/" ++ tl ++ "}{" ++ tx ++ "}")
   where tx = (treeToLaTeX (Map.findWithDefault [] "1" ll) st)
         tl = (shallowFlatten (Map.findWithDefault [] "1" ll))
 templateProcessor st ("ISSN", ll)
