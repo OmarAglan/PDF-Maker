@@ -347,6 +347,7 @@ formPage m s
                                              do H.select H.! A.style wwidth H.! A.name "expansion" $
                                                   do H.option H.! A.value "Print" $ "Standard"
                                                      H.option H.! A.value "BookMode" $ "Book / Collection"
+                                                     H.option H.! A.value "BookNoParent" $ "Book Contents Page"
                                                      H.option H.! A.value "MediaWiki" $ "Expand Templates by MediaWiki"
                                                      H.option H.! A.value "Normal" $ "Expand Templates Internally"
                                       H.tr $
@@ -387,6 +388,8 @@ formPage m s
         getRunmode "MediaWiki" = ImperativeState.ExpandedTemplates ImperativeState.No
         getRunmode "Normal" = ImperativeState.StandardTemplates ImperativeState.No
         getRunmode "BookMode" = ImperativeState.HTML ImperativeState.Yes 
+        getRunmode "BookNoParent" = ImperativeState.HTML ImperativeState.Yes 
+
         getRunmode _ = ImperativeState.HTML ImperativeState.No
         
         processForm :: ServerPart Response
@@ -431,7 +434,7 @@ formPage m s
                                                      if (toString (toStrict output)) == "odt" then
                                                        ImperativeState.OdtFile else
                                                        ImperativeState.PlainPDF,
-                                               compile = Nothing, imgctrb = Nothing,  convert=Nothing}
+                                               compile = Nothing, imgctrb = Nothing,  convert=Nothing, noparent= "BookNoParent" == (toString (toStrict expansion))}
                            yy <- newEmptyMVar
                            mm <- takeMVar m
                            _ <- if ((currentlyrunning mm)<=3) then

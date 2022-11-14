@@ -5,11 +5,11 @@ import Tools
 import Text.Printf
 import Data.Char
 import qualified Data.Map as Map
-import Data.Map.Strict (Map)
+import Data.Map.Strict (Map,keys)
 import Data.Maybe
 import Control.Monad
 import MyState
-
+import Data.List (intercalate)
 {-DHUN| the width of a columns as float wrapped in a Just value of the maybe monad if it could be determined. Return the value Nothing of the maybe monad otherwise. The only parameter is of part of the parse tree that describe the opening part of the table cell element. DHUN-}
 
 widthOfColumn :: [Anything Char] -> Maybe Float
@@ -268,68 +268,59 @@ verticalSeperator False = ""
 {-DHUN| the function returns the a string to be inserted into a latex document for multirows at a when a new column (that is a new cell) starts, thats when a column separator, or header column separator is encountered. The first parameter it the index of the current column. The second parameter is the multirowdict (see documentation of the multiRowDictChangeStart function in this module). The third parameter is a boolean. If it is true rules will be drawn in the table, otherwise they won't DHUN-}
 
 multiRowSymbol :: Int -> Map Int (Int, Int) -> Bool -> String
-multiRowSymbol i d t
-  = withDefault "" (> 0)
-      (\ _ b ->
-         "\\multicolumn{" ++
+multiRowSymbol i d t= s ++ (if any (>=i) (keys d) then (multiRowSymbol (i + (if bb==0 then 1 else bb)) d t) else "")
+
+  where
+    (bb,s)  = (withDefault (0,"") (> 0)  (\ _ b ->
+         (b,"\\multicolumn{" ++
            (show b) ++
              "}{" ++
                (verticalSeperator t) ++
                  "c" ++
-                   (verticalSeperator t) ++ "}{}&" ++ (multiRowSymbol (i + b) d t))
-      i
-      d
+                   (verticalSeperator t) ++ "}{}&" )) i d)
 
 {-DHUN| the function returns the a string to be inserted into a latex document for multirows at a when a new row starts, thats when a row separator is encountered. The first parameter it the index of the current column. The second parameter is the multirowdict (see documentation of the multiRowDictChangeStart function in this module). The third parameter is a boolean. If it is true rules will be drawn in the table, otherwise they won't DHUN-}
 
 multiRowSymbolForRowSep ::
                         Int -> Map Int (Int, Int) -> Bool -> String
-multiRowSymbolForRowSep i d t
-  = withDefault "" (> 0)
-      (\ _ b ->
-         "&\\multicolumn{" ++
+
+multiRowSymbolForRowSep i d t = intercalate "&" (multiRowSymbolForRowSepInner i d t)
+
+multiRowSymbolForRowSepInner ::
+                        Int -> Map Int (Int, Int) -> Bool -> [String]
+multiRowSymbolForRowSepInner i d t
+  = (if s=="" then [] else [s]) ++ (if any (>=i) (keys d) then (multiRowSymbolForRowSepInner (i + (if bb==0 then 1 else bb)) d t) else [])
+  where 
+   (bb,s)=(withDefault (0,"") (> 0)  (\ _ b ->  (b,"\\multicolumn{" ++
            (show b) ++
              "}{" ++
                (verticalSeperator t) ++
                  "c" ++
                    (verticalSeperator t) ++
-                     "}{}" ++ (multiRowSymbolForRowSep (i + b) d) t)
-      i
-      d
-
+                     "}{}" )) i d)
 {-DHUN| the function returns the a string to be inserted into a latex document for multirows at the end of the table. The first parameter it the index of the current column. The second parameter is the multirowdict (see documentation of the multiRowDictChangeStart function in this module). The third parameter is a boolean. If it is true rules will be drawn in the table, otherwise they won't DHUN-}
 
 multiRowSymbolForTableEnd ::
                           Int -> Map Int (Int, Int) -> Bool -> String
-multiRowSymbolForTableEnd i d t
-  = withDefault "" (> 0)
-      (\ _ b ->
-         "&\\multicolumn{" ++
-           (show b) ++
-             "}{" ++
-               (verticalSeperator t) ++
-                 "c" ++
-                   (verticalSeperator t) ++
-                     "}{}" ++ (multiRowSymbolForTableEnd (i + 1) d t))
-      i
-      d
+multiRowSymbolForTableEnd = multiRowSymbolForRowSep
 
 {-DHUN| in case of a multirow, that cell has to be skipped further down. So if I got a multirow in row 1 column 2 with a rowspan of 2 or more I need to expand row 2 column 1 by 1 . So if I passed row 2 column one I am not in row 2 column 2 since that is where the multirow cell resides, I am rather in row 2 cell 3. And if there are more multicolumns involved I am more possible even further right. So this function just tell me how many cells I have to skip. The first parameter is the index of the current column. The second parameter is the multirowdict. See also documentation on the function multiRowDictChangeStart in this module  DHUN-}
 
 multiRowCount :: Int -> Map Int (Int, Int) -> Int
 multiRowCount i d
-  = withDefault 0 (/= 0) (\ _ b -> b + (multiRowCount (i + 1) d)) i d
+  = (withDefault 0 (/= 0) (\ _ b -> b) i d) + (if any (>=i) (keys d) then (multiRowCount (i + 1) d) else 0)
 
 {-DHUN| see documentation on multiRowDictChangeStart. This function take the index of the current column as first parameter. This function takes the multiRowDict as first parameter and returns the modified version of it. DHUN-}
 
 multiRowDictChangeEnd ::
                       Int -> Map Int (Int, Int) -> Map Int (Int, Int)
 multiRowDictChangeEnd i d
-  = withDefault d (/= 0)
-      (\ a b ->
-         multiRowDictChangeEnd (i + 1) (Map.insert i (a - 1, b) d))
-      i
-      d
+  =  if  any (>=i) (keys d) then multiRowDictChangeEnd (i + 1) xx else xx
+    where
+      xx::Map Int (Int, Int)
+      xx= withDefault d (/= 0)  (\ a b ->  (Map.insert i (a - 1, b)) d) i d
+
+
 
 {-DHUN| The multiRowDict is a facility for keeping track of cells spanning multiple rows. It is stored as mutable state in the type TableState in the parameter multiRowMap. It is passed to this function as second parameter. This function return an updated version of it. It is a map mapping and Int to a tuple whose both elements are also ints. It the key is the column index and the value is a pair (rowmultiplicity, columnmultiplicity). The rowmultiplicity is the number of rows the cell spans. This number is decrease every time a row ends. So it actually says how many rows the columns spans further down from the current column. The column multiplicity is the number of columns the cell spans. This function take the index of the current column as first parameter. This function takes the parse result of the opening part of the cell environment of the current cell as third input parameter. This function calculates only the changes in the multirowdict for the opening environment of the cell. You should not use this function but rather use multiRowDictChange since this also considers the effect by ending of cells DHUN-}
 

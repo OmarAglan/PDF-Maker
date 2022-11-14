@@ -54,10 +54,10 @@ Use mediaWiki generated HTML as input (default).
 Output LaTeX Source Archive.
 .TP
 .BR -b ", " --epub
-Output epub file.
+Output epub file. Only works if packages latex2rtf and calibre are installed additionally.
 .TP
 .BR -d ", " --odt
-Output odt file. Open Document Text (for wordprocessors)
+Output odt file. Open Document Text (for wordprocessors). Only works if packages latex2rtf and libreoffice are installed additionally.
 .TP
 .BR -i ", " --internal
 Use internal template definitions.

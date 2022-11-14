@@ -19,7 +19,7 @@ import Licenses
 import Tools
 import ImperativeState
 import HtmlParser (parseHtmlFast)
-
+import Control.DeepSeq
 makeUrl2 :: String -> String -> [Char]
 makeUrl2 theLemma theHost
   = (unify . exportURL)
@@ -103,7 +103,7 @@ simpleContributors theLemma theHost uu st
                                                                                                   mm
                                                                                                 of
                                                                                                   (Just
-                                                                                                     x) -> "https://"
+                                                                                                     x) -> if (Data.List.take 8 x == "https://") then        (replace2 x "&amp;" "&") else "https://"
                                                                                                              ++
                                                                                                              theHost
                                                                                                                ++
@@ -117,10 +117,12 @@ simpleContributors theLemma theHost uu st
        xx <- geturl theUrl
        let y = decodeString yy
        let x = decodeString xx
+       let ff= (force (parseHtmlFast x))
        let dd
-             = ((deepGet "a" "class" "new mw-userlink" (parseHtmlFast x))
-                  ++ (deepGet "a" "class" "mw-userlink" (parseHtmlFast x)))
+             = (((deepGet "a" "class" "new mw-userlink" ff)
+                  ++ (deepGet "a" "class" "mw-userlink" ff)))
                  :: [Anything Char]
+
        let ll = (filter pre (map go dd))
        let n = (nub ll) :: [(String, String)]
        let out = map go2 (zip (map (count ll) n) n)
@@ -137,6 +139,7 @@ simpleContributors theLemma theHost uu st
           = ((shallowFlatten (deepFlatten l)), findWithDefault "" "href" m)
         go _ = ("", "")
         go2 (c, (a, h)) = (a, h, c, Nothing)
+
 
 count :: (Eq a) => [a] -> a -> Int
 count l s = length (filter (== s) l)

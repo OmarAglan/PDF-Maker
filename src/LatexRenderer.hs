@@ -26,7 +26,6 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad (guard, mplus, msum)
 import TableHelper
 import GHC.Float
-import Text.Highlighting.Kate
 import WikiLinkHelper
 import WikiHelper
 import Data.List.Split
@@ -54,7 +53,7 @@ rowaddsym st
       (if (currentColumn st) == 1 then
          replicate (((numberOfColumnsInTable st)) - (currentColumn st)) '&'
          else
-         replicate (((numberOfColumnsInTable st) + 1) - (currentColumn st))
+         replicate (((numberOfColumnsInTable st)) - (currentColumn st))
            '&')
       else []
 
@@ -86,7 +85,7 @@ tableContentToLaTeX ((Environment TableRowSep _ _) : [])
        return $
          (varwidthend st) ++
            (headendsym (lastCellWasHeaderCell st)) ++
-             (multiColumnEndSymbol (lastCellWasMultiColumn st)) ++
+             (multiColumnEndSymbol (lastCellWasMultiColumn st)) ++ (multiRowEndSymbol (lastCellWasMultiRow st)) ++
                (rowaddsym st{currentColumn = c})
 tableContentToLaTeX ((Environment TableRowSep _ l) : xs)
   = do sst <- lift get
@@ -129,7 +128,7 @@ tableContentToLaTeX ((Environment TableRowSep _ l) : xs)
                      (rowaddsym st{currentColumn = c}) ++
                        (rowendsymb ((getInTab sst) <= 1)
                           ((rowCounter st) == (inputLastRowOfHeader st) - 2))
-                         ++
+                          ++
                          (innerHorizontalLine (seperatingLinesRequestedForTable st)
                             (multiRowMap st3)
                             (numberOfColumnsInTable st))
@@ -228,13 +227,27 @@ tableContentToLaTeX []
        return $
          (varwidthend st) ++
            (headendsym (lastCellWasHeaderCell st)) ++
-             (multiColumnEndSymbol (lastCellWasMultiColumn st)) ++
+             (multiColumnEndSymbol (lastCellWasMultiColumn st)) ++                  (multiRowEndSymbol (lastCellWasMultiRow st)) ++
+                   (rowaddsym
+                      st{currentColumn = (c + (columnMultiplicityForCounting []))}) ++
                (multiRowSymbolForTableEnd (currentColumn st) (multiRowMap st)
                   (seperatingLinesRequestedForTable st))
-                 ++
-                 (multiRowEndSymbol (lastCellWasMultiRow st)) ++
-                   (rowaddsym
-                      st{currentColumn = (c + (columnMultiplicityForCounting []))})
+                 
+subTableCellCorrect:: [Anything Char]->[Anything Char]
+subTableCellCorrect [] = []
+subTableCellCorrect (x:xs) = if look then (smaller upto)++ (subTableCellCorrect (dropWhile p (x:xs))) else x:(subTableCellCorrect xs)
+  where 
+    p (Environment TableRowSep _ _) = False
+    p (Environment TableColSep _ _) = False
+    p (Environment TableHeadColSep _ _) = False
+    p _ = True
+    q (Environment Wikitable _ _) = (1::Integer)
+    q _ = 0
+    smaller ((Environment Wikitable (TagAttr t a) l):ys) = (Environment Wikitable (TagAttr t (Map.insert "class" "navbox" a)) l):(smaller ys)
+    smaller (y:ys) = y:(smaller ys)
+    smaller [] = []
+    upto = takeWhile p (x:xs)
+    look = (sum (map q upto)) >= 2
 
 {-DHUN| This string has to be added to each new cell in a latex table in order to allow for hyphenation of the first word in this cell DHUN-}
 
@@ -281,43 +294,6 @@ reformatTableCaption n (x : xs) st
   = x : reformatTableCaption n xs st
 reformatTableCaption _ [] _ = []
 
-{-DHUN| strips column separators out of a parse tree or part of which DHUN-}
-
-stripColSep :: [Anything Char] -> [Anything Char]
-stripColSep = filter go
-  where go (Environment TableHeadColSep _ _) = False
-        go (Environment TableColSep _ _) = False
-        go _ = True
-
-{-DHUN| predicate to test if an element in the parse tree is a row separator DHUN-}
-
-isRowSep :: Anything Char -> Bool
-isRowSep (Environment TableRowSep _ _) = True
-isRowSep _ = False
-
-{-DHUN| strip empty rows out of the parse tree DHUN-}
-
-stripempty :: [Anything Char] -> MyState -> [Anything Char]
-stripempty [] _ = []
-stripempty ((Environment TableRowSep a b) : xs) s
-  = (Environment TableRowSep a b) : (stripempty xs s)
-stripempty l s
-  = if pred2 then (stripempty post2 s) else
-      pre ++ (stripempty (post3 post) s)
-  where post2
-          = case post of
-                (x : xs) -> if isRowSep x then xs else post
-                [] -> post
-        post3 o
-          = case o of
-                (x : (y : xs)) -> if (isRowSep x) && (isRowSep y) then
-                                    post3 (y : xs) else (x : y : xs)
-                x -> x
-        pred2 = and (map (`elem` [' ', '\r', '\n']) inside)
-        pre = takeWhile (not . isRowSep) l
-        post = dropWhile (not . isRowSep) l
-        inside = (treeToLaTeX (stripColSep pre)) s
-
 {-DHUN| In order to determine the maximum width of columns, each table is precompiled with latex several times, with only one column included each time. this function creates the list of the latex sources of these tables, for one table in the parse tree DHUN-}
 
 maketablist ::
@@ -363,17 +339,17 @@ wdth3 _ _ = ([], 1.0)
 
 {-DHUN| Returns a table header which represents the width of the columns of a table in units of the line width with the proper corrections for use in the a latex documents. If the first boolean input parameter is true the table is understood to be written in landscape mode. It also take a map of Int to Double. This is the list of the maximum width of columns determined by  previous runs of latex on the table with only one column included per run. If second boolean parameter is true it is understood the the rule should be printed with the table, otherwise the table should be printed without rules DHUN-}
 
-wdth2 :: Bool -> Map Int Double -> Bool -> String
-wdth2 ls m b
+wdth2 :: Bool -> Map Int Double -> Bool -> Float -> String
+wdth2 ls m b f
   | m /= Map.empty =
     tableSpecifier b
       (map
-         ((* (1.0 - (scalefactor (fromIntegral n)))) .
+         ((* (f*(1.0 - (scalefactor (fromIntegral n))))) .
             double2Float . (/ (linew2 ls)))
          (Map.elems mm))
   where n = (maximum (Map.keys m))
         (mm, _) = wdth ls n m
-wdth2 _ _ _ = []
+wdth2 _ _ _ _ = []
 
 {-DHUN| takes the list of maximum column widths created by previous runs of the latex compiler with only one columns included per run as map from Int to Double. Take the total number of columns of the table as Int. The table is understood to be printed in landscape mode if the boolean parameter is true. It returns a map from int to double representing the width of columns of the table to be used in the latex documents. So it takes raw widths. Which are just the width of the column if the width of the paper was infinite and return the width that fit on the finite width of the real paper DHUN-}
 
@@ -435,17 +411,10 @@ linew2 ls = if ls then linew * 1.414 else linew
 linew :: Double
 linew = 455.45742
 
-hasTable :: [Anything a] -> Bool
-hasTable ll = or $ map go ll
-  where go :: Anything a -> Bool
-        go (Environment Wikitable _ _) = True
-        go (Environment _ _ l) = (hasTable l)
-        go _ = False
-
 {-DHUN| convert a table form the parse tree to latex. The [Anything Char] parameter it the contend of the table represented as a parse tree. The String parameter contains the HTML attributes of the table element, or in wiki notation the HTML parameters of the line beginning with  {| . This is evaluated in order to find out whether rules should be printed in the table. The return type is Renderer String. Which means that it returns a string but also take a state as additional monadic input parameter and returns a possible changed version of it as additional return parameter monadically DHUN-}
 
-tableToLaTeX :: [Anything Char] -> Bool -> String -> Renderer String
-tableToLaTeX l1 b s
+tableToLaTeX :: [Anything Char] -> Bool -> String -> Maybe Float -> Renderer String
+tableToLaTeX l1 b s m
   = do st <- get
        let modst = st{getF = (getF st) * (tableScale (numberOfColumns l))}
            ((_, oldstate), _)
@@ -461,15 +430,18 @@ tableToLaTeX l1 b s
                          (maketablist reformed tblstate (numberOfColumns l) modst) :
                            (tablist st)}
            reformed = ((reformatTableCaption (numberOfColumns l) l st))
-           l = stripempty l1 st
+           l = l1 --stripempty l1 st
            spec
              = case Map.lookup tbno (tabmap st) of
                    Nothing -> (if (tableSpecifier sep widths) == "" then
                                  "p{\\linewidth}" else tableSpecifier sep widths)
-                   Just t -> wdth2 lsc (Map.map ((if b then 0.5 else 1.0)*) t) sep
+                   Just t -> wdth2 lsc (Map.map ((if b then 0.5 else 1.0)*) t) sep (if b then 0.5 else 1.0)
            sep = seperatingLinesRequested s
            hline = horizontalLine sep
-           (widths, fontscalefactor)
+           widths = case m of
+                      Just d -> if sum basewidths > d / 400.0 then map ((d/400.0)*) basewidths else basewidths
+                      Nothing -> basewidths 
+           (basewidths, fontscalefactor)
              = case Map.lookup tbno (tabmap st) of
                    Nothing -> (columnWidths l, 1.0)
                    Just t -> wdth3 lsc t
@@ -481,7 +453,7 @@ tableToLaTeX l1 b s
            se = if scriptsize then "}" else ""
            lsc
              = (env == "longtable") &&
-                 (((numberOfColumns l) > 100) || (hasTable l1))
+                 (((numberOfColumns l) > 100))
            lsb = (if lsc then "\\begin{landscape}\n" else "")
            lse = (if lsc then "\n\\end{landscape}" else "")
            tbno = (length (tablist st)) + 1
@@ -519,7 +491,7 @@ tableToLaTeX l1 b s
                                             "}\n" ++
                                               (if fontscalefactor == 1.0 then "" else "}") ++
                                                 (if (env /= "tabular") then "" else "}") ++
-                                                  se ++ lse
+                                                  se ++ lse ++ (if (env == "tabular") then " " else "")
        return r
 
 {-DHUN| Converts an image from the parse tree to latex. The actual images is only referenced in the wiki source, as well as the parse tree, as well as the latex source. It takes a parse tree representation of the image as only input parameter. The return type is Renderer String. Which means that it returns a string but also take a state as additional monadic input parameter and returns a possible changed version of it as additional return parameter monadically DHUN-}
@@ -595,7 +567,7 @@ wikiImageToLaTeX l
 
 wikiLinkCaption :: [Anything Char] -> MyState -> String
 wikiLinkCaption l st = if isCaption x then rebuild x else ""
-  where x = (treeToLaTeX (last (splitOn [C '|'] l)) st)
+  where x = (treeToLaTeX (last (splitOn [C '|'] l)) st{getInCaption=True})
         rebuild (':' : xs) = xs
         rebuild b = b
 
@@ -1543,25 +1515,6 @@ templateProcessor st ("C++-Programmierung/ Vorlage:Syntax", ll)
        (treeToLaTeX (breakLines3 96 (Map.findWithDefault [] "code" ll))
           st)
          ++ "}}\n")
-templateProcessor st ("BigJava", ll)
-  = tempProcAdapter
-      (do x <- return
-                 ((replace2
-                     (replace2
-                        ("{\\ttfamily { " ++
-                           ((formatLaTeXBlock defaultFormatOpts)
-                              (highlightAs "java"
-                                 (shallowFlatten
-                                    (map renormalize
-                                       (breakLines3 96 (Map.findWithDefault [] "code" ll))))))
-                             ++ "}}\n")
-                        "\\begin{Shaded}"
-                        "")
-                     "\\end{Shaded}"
-                     ""))
-          lll <- mapM doFonts x
-          return (concat lll))
-      st
 templateProcessor st
   ("C++-Programmierung/ Vorlage:Kapitelanhang", ll)
   = (st,
@@ -1622,22 +1575,6 @@ templateProcessor st ("bcode:Example", ll)
                    (treeToLaTeX (breakLines3 96 (Map.findWithDefault [] "3" ll)) st)
                      ++ "}}"
                  else "")))
-templateProcessor st ("C++-Programmierung/ Vorlage:Code", ll)
-  = (st,
-     ("{\\ttfamily {\\scriptsize" ++
-        ((formatLaTeXBlock defaultFormatOpts)
-           (highlightAs "c++"
-              (shallowFlatten
-                 (map renormalize
-                    (breakLines3 96 (Map.findWithDefault [] "code" ll))))))
-          ++
-          "}}\n" ++
-            (if (Map.member "output" ll) then
-               "{\\bfseries Ausgabe}\n{\\ttfamily {\\scriptsize" ++
-                 (treeToLaTeX (breakLines3 96 (Map.findWithDefault [] "output" ll))
-                    st)
-                   ++ "}}"
-               else "")))
 templateProcessor st ("cite web", ll) = (st, mainer)
   where mainer
           = "\\myhref{" ++
@@ -1724,26 +1661,6 @@ templateProcessor st ("Java://", ll) = (st, mainer)
         
         code :: String
         code = trilexgen st{getInCode = True} ll "1"
-templateProcessor st ("LaTeX/Usage", ll)
-  = (st2,
-     if (getInTab st > 0) then "\\TemplateSource{" ++ (rtrim x) ++ "}\n"
-       else g)
-  where f = shallowFlatten
-              (map renormalize
-                 (breakLines3 linewidth (Map.findWithDefault [] "code" ll)))
-        g = (formatLaTeXBlock defaultFormatOpts) (highlightAs "Latex" f)
-        (x, st2)
-          = runState (treeToLaTeX2 (breakLines3 linewidth (map C f))) st
-templateProcessor st ("LaTeX/Example", ll)
-  = (st2,
-     "\\begin{longtable}{p{1.0\\linewidth}}\n" ++
-       g ++ "\\\\\n" ++ x ++ "\n\\end{longtable}")
-  where f = shallowFlatten
-              (map renormalize
-                 (breakLines3 linewidth (Map.findWithDefault [] "code" ll)))
-        g = (formatLaTeXBlock defaultFormatOpts) (highlightAs "Latex" f)
-        (x, st2)
-          = runState (treeToLaTeX2 (Map.findWithDefault [] "render" ll)) st
 templateProcessor st ("java://", ll) = (st, mainer)
   where mainer :: String
         mainer
@@ -1762,7 +1679,7 @@ templateProcessor st ("java", ll) = (st, mainer)
         code = trilex st{getInCode = True} ll
 templateProcessor st ("DOI", ll)
   = (st,
-     "DOI:\\myhref{https://doi.org/" ++ tl ++ "}{" ++ tx ++ "}")
+     "DOI:\\myhref{http://dx.doi.org/" ++ tl ++ "}{" ++ tx ++ "}")
   where tx = (treeToLaTeX (Map.findWithDefault [] "1" ll) st)
         tl = (shallowFlatten (Map.findWithDefault [] "1" ll))
 templateProcessor st ("ISSN", ll)
@@ -2416,14 +2333,6 @@ uncenter ((Environment e s l) : xs)
 uncenter (x : xs) = x : (uncenter xs)
 uncenter [] = []
 
-doFonts :: Char -> Renderer String
-doFonts c
-  = do st <- get
-       case (fontStack st) of
-           (x : _) -> if (getFont x c) == (font st) then return [c] else
-                        do put st{font = (getFont x c)}
-                           return ((fontsetter (getFont x c)) ++ (fontstyler x) ++ [c])
-           _ -> return [c]
 
 {-DHUN| converts a parse tree to latex. Takes the parse tree as first parameter. Takes the current state of the renderer as second input parameter. Returns the latex representation of the tree as return value. This function should only be used internally in latex renderer since it does not generate the table of names references for the ref tags. DHUN-}
 
@@ -2440,6 +2349,13 @@ treeToLaTeX3 l st = runState ttl2twice st
                put st{fndict = fndict b}
                treeToLaTeX2 l
 
+findwd :: String -> Maybe Float
+findwd ('w':'i':'d':'t':'h':':':xs) = case ((reads (takeWhile (`elem` "01234567890.") xs))::[(Float,String)]) of 
+                                      [(_,_)] -> Nothing
+                                      _ -> Nothing
+findwd (_:xs) = findwd xs
+findwd [] = Nothing
+ 
 {-DHUN| converts a parse tree to latex. Takes the parse tree as first parameter. Takes the current state of the renderer as second input parameter. Returns the latex representation of the tree as Renderer String. So it actually takes the current state of the renderer as additional monadic input parameter and returns a possible modified version of it as additional monadic return parameter. This function should only be used internally in latex renderer since it does not generate the table of names references for the ref tags. DHUN-}
 
 treeToLaTeX2 :: [Anything Char] -> Renderer String
@@ -2538,18 +2454,18 @@ treeToLaTeX2 ll
         nodeToLaTeX (Environment Wikitable (Str s) l)
           = do st <- get
                put $ st{getInTab = (getInTab st) + 1}
-               d <- tableToLaTeX l False s
+               d <- tableToLaTeX l False s Nothing
                st2 <- get
                put $ st2{getInTab = (getInTab st)}
                return d
         nodeToLaTeX (Environment Wikitable (TagAttr _ a) l)
           = do st <- get
                put $ st{getInTab = (getInTab st) + 1}
-               d <- tableToLaTeX l (maybe False (\x->or (map ($ x) (map isInfixOf ["navbox", "infobox"]))) (Map.lookup "class" a))
+               d <- tableToLaTeX (subTableCellCorrect l) (maybe False (\x->or (map ($ x) (map isInfixOf ["navbox", "infobox"]))) (Map.lookup "class" a))
                       (if
                          (Map.lookup "class" a) `elem`
                            (map Just ["prettytable", "wikitable"])
-                         then "class=\"wikitable\"" else "")
+                         then "class=\"wikitable\"" else "") ((Map.lookup "style" a)>>= findwd)  
                st2 <- get
                put $ st2{getInTab = (getInTab st)}
                return d
@@ -2734,6 +2650,10 @@ treeToLaTeX2 ll
           = return $ "{$_{\\textrm{\\scriptsize " ++ s ++ "}}$}"
         nodeToLaTeX (Environment Tag (TagAttr "u" _) l)
           = walk "\\uline{" l "}"
+        nodeToLaTeX (Environment Tag (TagAttr "p" _) l)
+          = do st <- get
+               if  (not (getInFootnote st)) && (not (getInCaption st)) && (not ((getInTab st) > 0)) then walk "" l "\n\n" else walk "" l ""
+
         nodeToLaTeX (Environment Tag (TagAttr "ins" _) l)
           = walk "\\uline{" l "}"
         nodeToLaTeX (Environment Tag (TagAttr "del" _) l)
@@ -2860,58 +2780,7 @@ treeToLaTeX2 ll
                          else f
                d <- treeToLaTeX2
                       (breakLines3 linewidth (if glines then map C newlines else xg))
-               st <- get
-               case
-                 do aa <- Map.lookup "lang" a
-                    guard (not (getInFootnote st))
-                    guard (not ((getInTab st) > 0))
-                    return aa
-                 of
-                   Just j -> do gg <- return $
-                                        '\n' :
-                                          replace2
-                                            (replace2
-                                               (replace2
-                                                  (replace2
-                                                     (replace2
-                                                        (replace2
-                                                           (replace2
-                                                              (replace2
-                                                                 (replace2
-                                                                    (replace2
-                                                                       (replace2
-                                                                          (replace2
-                                                                             ((formatLaTeXBlock
-                                                                                 defaultFormatOpts)
-                                                                                (highlightAs j
-                                                                                   newlines))
-                                                                             "'"
-                                                                             "\\textquotesingle{}")
-                                                                          "\n"
-                                                                          "\\newline\n")
-                                                                       "{Shaded}\\newline\n"
-                                                                       "{Shaded}\n")
-                                                                    "{Highlighting}[]\\newline\n\\newline\n"
-                                                                    "{Highlighting}[]\n")
-                                                                 "{Highlighting}\\newline\n"
-                                                                 "{Highlighting}\n")
-                                                              " "
-                                                              "\\ensuremath{\\text{ }}")
-                                                           "%"
-                                                           "\\%")
-                                                        "$"
-                                                        "\\$")
-                                                     "{Highlighting}[]\\newline\n"
-                                                     "{Highlighting}[]\n")
-                                                  "&"
-                                                  "\\&")
-                                               "_"
-                                               "\\_")
-                                            "^"
-                                            "\\^{}"
-                                lll <- mapM doFonts gg
-                                return (concat lll)
-                   Nothing -> return ("\\TemplateSource{" ++ (rtrim d) ++ "}\n")
+               return ("\\TemplateSource{" ++ (rtrim d) ++ "}\n")
         nodeToLaTeX (Environment Tag (TagAttr "font" a) l)
           = if Map.member "style" a then
               if

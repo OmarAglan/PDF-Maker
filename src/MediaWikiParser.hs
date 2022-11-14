@@ -1322,7 +1322,7 @@ maketagparser3 tags
 
 nonNestTags :: [String]
 nonNestTags
-  = ["tt", "pre", "TT", "PRE", "b", "B", "i", "I", "sc", "SC", "li",
+  = ["tt", "pre", "TT", "PRE", "b", "B", "i", "I", "sc", "SC",
      "code", "CODE"]
 
 {-DHUN| Returns a parser that matches all HTML elements, given by the list of strings given as first input parameter. The parser matches only inside tables. Use maketagparser for that DHUN-}
@@ -1980,6 +1980,16 @@ printPrepareTree ll = concat (map printPrepareNode ll)
           | (Map.lookup "class" m) == (Just "editsection") = []
         printPrepareNode (Environment Tag (TagAttr "span" m) _)
           | (Map.lookup "class" m) == (Just "mw-editsection") = []
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "id" m) == (Just "mw-navigation") = []   
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "id" m) == (Just "mw-panel") = []
+        printPrepareNode (Environment Tag (TagAttr "ul" m) _)
+          | (Map.lookup "id" m) == (Just "footer-places") = []
+        printPrepareNode (Environment Tag (TagAttr "ul" m) _)
+          | (Map.lookup "id" m) == (Just "footer-icons") = []
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "id" m) == (Just "mw-panel") = []
         printPrepareNode (Environment Tag (TagAttr "a" m) l)
           = case (Map.lookup "class" m) of
                 (Just "image") -> imgfun m (printPrepareTree l) Nothing

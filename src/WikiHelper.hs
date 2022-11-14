@@ -70,16 +70,33 @@ isImage x
 
 shallowFlatten :: [Anything Char] -> String
 shallowFlatten ((C a) : xs) = a : (shallowFlatten xs)
+shallowFlatten ((Environment HtmlChar (Str "quot") _) : xs)
+  = '"' : (shallowFlatten xs)
 shallowFlatten ((Environment HtmlChar (Str "amp") _) : xs)
   = '&' : (shallowFlatten xs)
 shallowFlatten ((Environment HtmlChar (Str "lt") _) : xs)
   = '<' : (shallowFlatten xs)
 shallowFlatten ((Environment HtmlChar (Str "gt") _) : xs)
   = '>' : (shallowFlatten xs)
+shallowFlatten ((Environment NumHtml (Str s) _):xs)
+   = let h= (case reads s of
+                  [] -> case
+                          do z <- case s of
+                                      ('x' : xxs) -> Just xxs
+                                      ('X' : xxs) -> Just xxs
+                                      _ -> Nothing
+                             g <- unhex z
+                             return g
+                          of
+                            Just x -> chr . fromIntegral $ x
+                            Nothing -> '?'
+                  (x : _) -> chr . fst $ x) in h: (shallowFlatten xs) 
 shallowFlatten ((Environment SpaceIndent _ l) : xs)
   = '\n' : ((shallowFlatten l) ++ (shallowFlatten xs))
 shallowFlatten (_ : xs) = shallowFlatten xs
 shallowFlatten [] = []
+
+
 
 {-DHUN| A link in wiki notation is given by [foorbar.com a caption]. This function returns the location the link points to so foobar.com as String. It takes the parse tree representation of the  link as input parameter DHUN-}
 
@@ -96,13 +113,17 @@ linkLocation l
                    (g : _) -> g)
 
 normalizeExtensionHtml :: String -> String
-normalizeExtensionHtml ('s' : ('v' : ('g' : _))) = "png"
+normalizeExtensionHtml ('s' : ('v' : ('g' : _))) = "svg"
 normalizeExtensionHtml ('j' : ('p' : ('e' : ('g' : _)))) = "jpg"
 normalizeExtensionHtml ('j' : ('p' : ('g' : _))) = "jpg"
 normalizeExtensionHtml ('g' : ('i' : ('f' : _))) = "gif"
 normalizeExtensionHtml ('p' : ('n' : ('g' : _))) = "png"
 normalizeExtensionHtml ('t' : ('i' : ('f' : ('f' : _)))) = "png"
 normalizeExtensionHtml ('t' : ('i' : ('f' : _))) = "png"
+normalizeExtensionHtml  ('s' : ('t' : ('l' : _))) = "png"
+normalizeExtensionHtml  ('x' : ('c' : ('f' : _))) = "png"
+normalizeExtensionHtml  ('d' : ('j' : ('v' :('u': _)))) = "png"
+normalizeExtensionHtml  ('w' : ('e' : ('b' :('p': _)))) = "png"
 normalizeExtensionHtml (' ' : xs) = normalizeExtension xs
 normalizeExtensionHtml (x : xs) = x : (normalizeExtension xs)
 normalizeExtensionHtml [] = []
@@ -117,6 +138,10 @@ normalizeExtension ('g' : ('i' : ('f' : _))) = "png"
 normalizeExtension ('p' : ('n' : ('g' : _))) = "png"
 normalizeExtension ('t' : ('i' : ('f' : ('f' : _)))) = "png"
 normalizeExtension ('t' : ('i' : ('f' : _))) = "png"
+normalizeExtension ('s' : ('t' : ('l' : _))) = "png"
+normalizeExtension ('x' : ('c' : ('f' : _))) = "png"
+normalizeExtension ('d' : ('j' : ('v' :('u': _)))) = "png"
+normalizeExtension  ('w' : ('e' : ('b' :('p': _)))) = "png"
 normalizeExtension (' ' : xs) = normalizeExtension xs
 normalizeExtension (x : xs) = x : (normalizeExtension xs)
 normalizeExtension [] = []
@@ -131,6 +156,10 @@ normalizeExtension2 ('g' : ('i' : ('f' : _))) = "gif"
 normalizeExtension2 ('p' : ('n' : ('g' : _))) = "png"
 normalizeExtension2 ('t' : ('i' : ('f' : ('f' : _)))) = "tif"
 normalizeExtension2 ('t' : ('i' : ('f' : _))) = "tif"
+normalizeExtension2 ('s' : ('t' : ('l' : _))) = "stl"
+normalizeExtension2 ('x' : ('c' : ('f' : _))) = "xcf"
+normalizeExtension2 ('d' : ('j' : ('v' :('u': _)))) = "djvu"
+normalizeExtension2  ('w' : ('e' : ('b' :('p': _)))) = "webp"
 normalizeExtension2 (' ' : xs) = normalizeExtension xs
 normalizeExtension2 (x : xs) = x : (normalizeExtension xs)
 normalizeExtension2 [] = []
@@ -214,7 +243,8 @@ replist
      ("\\begin{align}", "\\begin{aligned}"),
      ("\\end{align}", "\\end{aligned}"), ("\\\\%", "\\%"),
      ("\\part ", "\\partial "), ("\\part{", "\\partial{"), ("\\;", ""),
-     ("\\|", "\\Vert"), ("\\!", ""), ("\\part\\", "\\partial\\")]
+     ("\\|", "\\Vert"), ("\\!", ""), ("\\part\\", "\\partial\\"),  ("&#10;", "{\\newline}"),
+     ("&#39;", "'")]
 
 {-DHUN| helper function for line breaking in source code and preformatted block. Not to be called from outside this module. Converts character to parse tree entities, to be process by breakLinesHelper3 DHUN-}
 

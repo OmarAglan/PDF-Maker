@@ -48,6 +48,7 @@ import System.IO.Error
 import HtmlParser (parseHtml)
 import Data.ByteString.Char8 (singleton,any)
 import Data.Word8 (isSpace)
+import Network.URI
 
 {-DHUN| takes a filename as input parameter and returns the so called normalized extension for it. This is and extension classifying the type of the file while used in this program. Its not necessarily the real extension of the filename. For example .jpeg images will be converted to jpg and so on. DHUN-}
 
@@ -102,12 +103,12 @@ runFileMods p filenamebase extension theResolution gals imgNumber
   = case extension of
         ('s' : ('v' : ('g' : _))) -> do _ <- system
                                                ((getPathPrefix p) ++
-                                                  "rsvg-convert -o " ++
+                                                  "rsvg-convert -u -o " ++
                                                     pngfilename ++ " -a -w 1250 " ++ filename)
                                         postprocpng pngfilename
                                         _ <- system
                                                ((getPathPrefix p) ++
-                                                  "rsvg-convert --format=pdf -o " ++
+                                                  "rsvg-convert -u --format=pdf -o " ++
                                                     (filenamebase ++ "." ++ "pdf") ++
                                                       " -a -w 1250 " ++ filename)
                                         return ()
@@ -118,8 +119,18 @@ runFileMods p filenamebase extension theResolution gals imgNumber
                                         postprocpng newfilename
         ('t' : ('i' : ('f' : _))) -> do stdfun
                                         postprocpng newfilename
+
+        ('x' : ('c' : ('f' : _))) -> do stdfun
+                                        postprocpng newfilename
         ('j' : ('p' : ('g' : _))) -> postprocjpg filename
         ('p' : ('n' : ('g' : _))) -> postprocpng filename
+        ('d' : ('j' : ('v' :('u': _)))) -> do djvupng
+                                              b <- doesFileExist firstpngfilename
+                                              if b then copyFile firstpngfilename newfilename else
+                                                 return ()
+        ('w' : ('e' : ('b' :('p': _)))) -> do stdfun
+                                              postprocpng newfilename
+                                        
         _ -> return ()
   where firstpngfilename
           = (reverse . (drop 4) . reverse $ newfilename) ++ "-0.png"
@@ -130,6 +141,12 @@ runFileMods p filenamebase extension theResolution gals imgNumber
                       ((getConvert p) ++
                          "\"" ++ filename ++ "\" \"" ++ newfilename ++ "\"")
                return ()
+
+        
+        djvupng  = do _ <- system ("ddjvu -format=pdf "++   "\"" ++ filename ++ "\"  \"" ++ filenamebase ++ ".pdf" ++ "\"")
+                      _ <- system   ((getConvert p) ++
+                         "\"" ++ filenamebase ++ ".pdf" ++ "\" \"" ++ newfilename ++ "\"")
+                      return ()
         postprocpng fn
           = do _ <- background fn
                dither fn
@@ -347,9 +364,9 @@ runLaTeXCallback config pathname
                                           (toStrict (fromArchive a))
                                         Data.ByteString.readFile "main.zip"
                        OdtFile -> do setCurrentDirectory ".."
-                                     mysystem "libreoffice --headless  --convert-to odt index.html"
-                                     mysystem "libreoffice --headless  --convert-to docx index.odt"
-                                     mysystem "libreoffice --headless  --convert-to odt index.docx"
+                                     mysystem "libreoffice --headless --convert-to odt index.html"
+                                     mysystem "libreoffice --headless --convert-to html:HTML:EmbedImages index.odt"
+                                     mysystem "libreoffice --headless --convert-to odt index.html"
                                      Data.ByteString.readFile "index.odt"
                        EPubFile -> do mysystem "ebook-convert ../index.html .epub"
                                       Data.ByteString.readFile "index.epub"
@@ -599,7 +616,7 @@ all cfg
                       "https://" ++ (inputUrl cfg))
                  "_"
                  " "
-       purl <- parseUrl uurl
+       purl <- parseUrl (escapeURIString isAllowedInURI uurl)
        language <- liftIO $ getLang (UrlAnalyse.url purl)
        put st{fullUrl = purl}
        minInit
@@ -617,10 +634,12 @@ all cfg
                                                    UserTemplateFile Yes _ -> True
                                                    StandardTemplates Yes -> True
                                                    ExpandedTemplates Yes -> True 
-                                                   _ -> False )then case (loadacu st) of {Right ac->ac;_->[]}else
+                                                   _ -> False )then case (loadacu st) of {Right _->(parseit minparsers text);_->[]}else
                              (parseit (if (runMode cfg) == (HTML No) then minparsers else parsers)
                                 text)))
                         else return []
+       liftIO $ print (theFormulas)
+       liftIO $ print (loadacu st)
        liftIO
          (myprint
             (" number of bytes to be parsed: " ++

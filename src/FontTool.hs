@@ -32,7 +32,7 @@ getFont fontStyle c
 
 fontsetter :: Font -> [Char]
 fontsetter f
-  = "\\setmainfont" ++ inner ++ "\\setmonofont" ++ innermono
+  = "\\allowbreak{}\\setmainfont" ++ inner ++ "\\setmonofont" ++ innermono
   where filename
           = reverse ((takeWhile (/= '/')) (reverse (getttf f)))
         pathname = reverse ((dropWhile (/= '/')) (reverse (getttf f)))

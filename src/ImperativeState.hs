@@ -88,12 +88,12 @@ imperativeStateZero
   = do v <- newMVar (0 :: Int)
        return
          ImperativeState{audict = [], fullUrl = fullWikiUrlZero,
-                         tmpPath = "", counter = v, loadacu = Right []}
+                         tmpPath = "", counter = v, loadacu = Right [], vectorr=False, noparentis=False}
 
 data ImperativeState = ImperativeState{audict ::
                                        [(Map String Contributor)],
                                        fullUrl :: FullWikiUrl, tmpPath :: String,
-                                       counter :: MVar Int, loadacu :: Either [FilePath] [Anything Char]}
+                                       counter :: MVar Int, loadacu :: Either [FilePath] [Anything Char], vectorr::Bool, noparentis::Bool}
 
 
 
@@ -132,7 +132,7 @@ data FullConfig = FullConfig{headers :: Maybe String,
                              vector :: Bool, copy :: Maybe String, mainPath :: String,
                              server :: Maybe Int, outputType :: OutputType,
                              selfTest :: Maybe (Integer, Integer), compile :: Maybe String,
-                             imgctrb :: Maybe String, convert:: Maybe (ConvertState)}
+                             imgctrb :: Maybe String, convert:: Maybe (ConvertState), noparent::Bool}
                 deriving (Show, Read, Serialize, Generic)
 
 fullconfigbase :: FullConfig
@@ -141,4 +141,4 @@ fullconfigbase
                outputFilename = "", inputUrl = "", runMode = HTML No, paper = "A4",
                vector = False, copy = Nothing, mainPath = "", server = Nothing,
                outputType = PlainPDF, selfTest = Nothing, compile = Nothing,
-               imgctrb = Nothing, convert =Nothing}
+               imgctrb = Nothing, convert =Nothing, noparent=False}

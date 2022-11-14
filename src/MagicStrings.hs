@@ -469,6 +469,8 @@ htmlchars
      ("#254", "{\\mbox{$\\text{\\thorn}$}}"),
      ("#255", "{\\mbox{$\\text{\\\"y}$}}"),
      ("yuml", "{\\mbox{$\\text{\\\"y}$}}"),
+     ("#10", "{\\newline}"),
+     ("#39", "'"),
      ("sum", "{\\mbox{$\\sum$}}"), ("ang", "{\\mbox{$\\angle$}}"),
      ("and", "{\\mbox{$\\wedge$}}"), ("cap", "{\\mbox{$\\cap$}}"),
      ("cup", "{\\mbox{$\\cup$}}"), ("int", "{\\mbox{$\\int$}}"),
@@ -531,10 +533,10 @@ removePrintVersion lem
 
 goodtags1 :: [[Char]]
 goodtags1
-  = ["includeonly", "references", "blockquote", "noinclude",
+  = ["templatestyles", "includeonly", "references", "blockquote", "noinclude",
      "noframes", "frameset", "colgroup", "fieldset", "basefont",
      "!DOCTYPE", "noscript", "address", "acronym", "caption", "strong",
-     "applet", "script", "button", "select", "section", "legend",
+     "applet", "script", "button", "select", "section", "legend", "footer",
      "strike", "object", "input", "center", "legend", "iframe", "small",
      "video", "audio", "style", "input", "label", "tbody", "thead",
      "title", "track" ,"frame", "param", "base", "area", "font", "code", "span",

@@ -38,6 +38,7 @@ data Flag = Verbose
           | Zip
           | EPub
           | Odt
+          | NoParent
           | Server String
           deriving (Show, Eq)
 
@@ -121,6 +122,12 @@ vectorOption = "vector"
 copyOption :: String
 copyOption = "copy"
 
+{-DHUN| String constant for the noparent command line option. DHUN-}
+
+noparentOption :: String
+noparentOption = "noparent"
+
+
 {-DHUN| String constant on for the server command line option. DHUN-}
 
 serverOption :: String
@@ -161,6 +168,8 @@ options
        "use MediaWiki to expand templates",
      Option ['h'] [html] (NoArg Main.HTML)
        "use MediaWiki generated html as input (default)",
+     Option ['n'] [noparentOption] (NoArg Main.NoParent)
+       "only include urls which a children of start url",
      Option ['k'] [bookmode] (NoArg Main.BookMode)
        "use book-namespace mode for expansion",
      Option ['z'] [Main.zip] (NoArg Main.Zip)
@@ -194,7 +203,7 @@ header = "Usage: mediawiki2latex [OPTION...]"
 
 versionHeader :: String
 versionHeader
-  = "mediawiki2latex version 7.37\n" ++ (usageInfo header options)
+  = "mediawiki2latex version 7.45\n" ++ (usageInfo header options)
 
 {-DHUN| print the version string of mediawiki2latex. Takes the output of the compilerOpts function as input. Prints the version string if no options were given or the version command was given does noting otherwise DHUN-}
 
@@ -321,7 +330,7 @@ checkOpts cwd o
                                                       ImperativeState.copy = Nothing, mainPath = "",
                                                       server = Nothing, selfTest = Just (s, e),
                                                       outputType = PlainPDF, compile = Nothing,
-                                                      imgctrb = Nothing, convert=Nothing}
+                                                      imgctrb = Nothing, convert=Nothing, noparent=False}
                          _ -> Left (NotIntegerPairError featuredOption)
            _ -> case serverVal of
                     Just x -> case reads x of
@@ -335,7 +344,7 @@ checkOpts cwd o
                                                            mainPath = "", server = Just z,
                                                            outputType = PlainPDF,
                                                            selfTest = Nothing, compile = Nothing,
-                                                           imgctrb = Nothing,  convert=Nothing}
+                                                           imgctrb = Nothing,  convert=Nothing, noparent=False}
                                   _ -> Left (NotIntegerError serverOption)
                     _ -> do hexVal <- atMostOne hexPredicate hexen o
                             case hexVal of
@@ -369,6 +378,7 @@ checkOpts cwd o
                                         let htmlVal = (Main.HTML `elem` o)
                                         let zipVal = (Main.Zip `elem` o)
                                         let epubVal = (Main.EPub `elem` o)
+                                        let noparentVal = (Main.NoParent `elem` o)
                                         let odtVal = (Main.Odt `elem` o)
                                         let temVal = (Main.InternalTemplates `elem` o)
                                         let vectorVal = (Main.Vector `elem` o)
@@ -407,7 +417,7 @@ checkOpts cwd o
                                                         if zipVal then ZipArchive else
                                                           if epubVal then EPubFile else
                                                             if odtVal then OdtFile else PlainPDF,
-                                                      compile = Nothing, imgctrb = Nothing, convert=Nothing})
+                                                      compile = Nothing, imgctrb = Nothing, convert=Nothing, noparent=noparentVal})
 
 {-DHUN| main entry point of mediawiki2latex DHUN-}
 
@@ -437,7 +447,7 @@ main
                                             Just zz -> serve zz
                                             _ -> do print x
                                                     (xx, _) <- (runStateT (runExceptT (All.all x))
-                                                                  stz)
+                                                                  stz {vectorr=(vector x)})
                                                     case xx of
                                                         Left n -> print n
                                                         _ -> return ()

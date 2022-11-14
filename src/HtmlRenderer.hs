@@ -7,15 +7,13 @@ import Data.Map.Strict (Map)
 import Control.Monad.Trans.State (State, state, runState, put, get)
 import LatexRenderer
 import WikiHelper
+import WikiLinkHelper
 import Tools
 import Data.Char
 import Text.Printf
 import Babel
-import Control.Monad (guard)
 import Data.String.HT (trim)
 import Data.List.Split
-import Text.Highlighting.Kate
-import Text.Blaze.Html.Renderer.String
 import Data.Tuple
 import Data.Hashable
 import Hex
@@ -127,7 +125,7 @@ wikiImageToHtml l
                          " src=\"./images/" ++
                            (n st) ++
                              "." ++
-                               ext ++
+                               (if (ext=="svg" && (not (MyState.vector st))) then "png" else ext) ++
                                  "\" style=\"width: " ++
                                    (if (tb st) then "100.0" else (mysize st)) ++
                                      "%;\">" ++
@@ -291,35 +289,30 @@ treeToHtml2 ll
                       else return [c]
                put st{lastChar = c}
                return x
+        nodeToHtml (Environment HtmlChar (Str s) _)
+          = return ("&"++s++";")
         nodeToHtml (Environment Wikilink _ l)
           = do st <- get
-               if getInHeading st then return $ wikiLinkCaption l st else
+               if getInHeading st then return $ wikiLinkCaptionHtml l st else
                  if (isImage (shallowFlatten l)) then wikiImageToHtml l else
-                   return $ wikiLinkCaption l st
+                   return $ wikiLinkCaptionHtml l st
         nodeToHtml (Environment Tag (TagAttr "br" _) _) = return "<br/>"
         nodeToHtml (Environment Tag (TagAttr "script" _) _) = return []
-        nodeToHtml (Environment Source (TagAttr _ a) l)
+        nodeToHtml (Environment Source (TagAttr _ _) l)
           = do let g = case reverse l of
                            [] -> []
                            (x : xs) -> if x == (C '\n') then reverse xs else l
-               let f = shallowFlatten (map renormalize (breakLines3 linewidth l))
                d <- treeToHtml2 (breakLines3 linewidth g)
-               st <- get
-               return $
-                 case
-                   do aa <- Map.lookup "lang" a
-                      guard (not (getInFootnote st))
-                      guard (not ((getInTab st) > 0))
-                      return aa
-                   of
-                     Just j -> (renderHtml
-                                  ((formatHtmlBlock defaultFormatOpts) (highlightAs j f)))
-                     Nothing -> (rtrim d)
+               return $ (rtrim d)
         nodeToHtml (Environment Template (Str s) l) = templateToHtml l s
+        nodeToHtml (Environment Wikitable (TagAttr _ m) l)
+          = walk ("<table "++ (writedict (Map.toList m))++" ><tr>") l "</tr></table>"
         nodeToHtml (Environment Wikitable _ l)
-          = walk "<table><tr>" l "</table></tr>"
+          = walk "<table><tr>" l "</tr></table>"
         nodeToHtml (Environment TableRowSep _ _) = return "</tr><tr>"
-        nodeToHtml (Environment TableColSep _ _) = return "</td><td>"
+        nodeToHtml (Environment TableColSep (TagAttr _ m) _) = return ("</td><td "++(writedict (Map.toList m)) ++" >")
+
+        nodeToHtml (Environment TableColSep _ _) = return ("</td><td>")
         nodeToHtml (Environment TableHeadColSep _ _) = return "</th><th>"
         nodeToHtml (Environment TableCap _ l)
           = walk "<caption>" l "</caption>"
@@ -336,9 +329,11 @@ treeToHtml2 ll
         nodeToHtml (Item _) = return "</li><li>"
         nodeToHtml (Environment Tag (TagAttr "noscript" _) _) = return []
         nodeToHtml (Environment Tag (TagAttr "head" _) _) = return []
-        nodeToHtml (Environment Tag (TagAttr "a" _) l) = walk "" l ""
+        nodeToHtml (Environment Tag (TagAttr "a" m) l) = do st<-get
+                                                            walk ("<a " ++ (writedict (Map.toList (Map.update (\r-> if (take 5 r) == "/wiki" then Just (wikiUrlDataToString (urld st) r) else Just r) "href" m))) ++ ">") l  ("</a>")
         nodeToHtml (Environment Tag (TagAttr "body" _) l) = walk "" l ""
         nodeToHtml (Environment Tag (TagAttr "html" _) l) = walk "" l ""
+        nodeToHtml (Environment NumHtml (Str s) l) = walk ("&#"++s++";") l ""
         nodeToHtml (Environment Tag (TagAttr "div" a) l)
           = if (Map.member "class" a) then
               if

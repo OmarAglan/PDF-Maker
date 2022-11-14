@@ -1,5 +1,5 @@
 Name:           mediawiki2latex
-Version:        7.37
+Version:        7.45
 License:        GPL
 License-File:   LICENSE
 Author:         Dirk Hünniger <dirk.hunniger@googlemail.com>
@@ -130,7 +130,6 @@ Executable mediawiki2latex
     split >=0.1.2.3 ,
     containers >=0.3 ,
     base >=4.1 && < 5,
-    highlighting-kate >=0.5,
     utility-ht >=0.0.5 ,
     transformers >=0.3 ,
     directory >=1.0 ,
@@ -179,6 +178,7 @@ Executable mediawiki2latex
     UrlAnalyse
     WikiHelper
     WikiLinkHelper
+    HtmlParser
 
   GHC-Options:    -Wall -fno-warn-orphans -O2 -rtsopts "-with-rtsopts=-K1000M -N" -threaded -optl-Wl,-z,relro -optl-Wl,-z,now 
   Hs-Source-Dirs: src

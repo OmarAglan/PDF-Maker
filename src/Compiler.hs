@@ -77,14 +77,14 @@ compile theRunMode text templates tabs mytitle mylanguage formulas
                                        (hostname . fullUrl $ st)
                                        templates
                                        tabs
-                                       formulas)
+                                       formulas (vectorr st))
            UserTemplateFile No _ -> return
                                       (run b mylanguage mytitle (parseit parsers text)
                                         (parseit parsers text)
                                         (hostname . fullUrl $ st)
                                         templates
                                         tabs
-                                        formulas)
+                                        formulas (vectorr st))
            HTML No  -> do --liftIO (Tools.writeFile "/home/dirk/dhudhu" (show (printPrepareTree(parseit minparsers text))))
                           return
                            (run b mylanguage mytitle
@@ -93,16 +93,16 @@ compile theRunMode text templates tabs mytitle mylanguage formulas
                             (hostname . fullUrl $ st)
                              templates
                              tabs
-                             formulas)
+                             formulas (vectorr st))
            ExpandedTemplates No -> do return
                                        (run b mylanguage mytitle (parseit parsers text)
                                         (parseit parsers text)
                                         (hostname . fullUrl $ st)
                                         templates
                                         tabs
-                                        formulas)
+                                        formulas (vectorr st))
            _ -> do case loadacu st of 
-                       Right pt -> return  (run b mylanguage mytitle pt pt  (hostname . fullUrl $ st)   templates tabs  formulas)
+                       Right pt -> return  (run b mylanguage mytitle pt pt  (hostname . fullUrl $ st)   templates tabs  formulas (vectorr st))
                        Left pt -> (runcheap b mylanguage mytitle pt  (hostname . fullUrl $ st)   templates tabs  formulas theRunMode)
 
 {-DHUN| pathname of the temporary directory of the compiler |DHUN-}
@@ -178,9 +178,9 @@ run ::
           [Anything Char] ->
             [Anything Char] ->
               String ->
-                String -> [[ByteString]] -> Map.Map String Int -> CompileResult
-run bb mylanguage mytitle parsetree parsetree2 netloc tmpl
-  someTables formulas
+                String -> [[ByteString]] -> Map.Map String Int -> Bool ->CompileResult
+run bb mylanguage mytitle parsetree parsetree2 netloc tmpl 
+  someTables formulas vec
   = CompileResult{images = img, body = bdy, tablelist = theTables,
                   galleryNumbers = gals, title = tit,
                   html = if bb then trda3 else []}
@@ -197,7 +197,7 @@ run bb mylanguage mytitle parsetree parsetree2 netloc tmpl
                                                                                             $ g})
         alldata3 g u
           = (treeToHtml3 formulas mylanguage mytitle ((snd . newtree $ g))
-               initialState{urld = analyseNetloc netloc}{tabmap = u,
+               initialState{urld = analyseNetloc netloc}{MyState.vector=vec, tabmap = u,
                                                          templateMap =
                                                            getUserTemplateMap
                                                              (read tmpl :: [[String]])}{urls =

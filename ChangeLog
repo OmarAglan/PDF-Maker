@@ -1,3 +1,59 @@
+Version 7.45
+        * src
+        remove navigation toolsbars
+Version 7.44
+        * src
+        user agent header added to https requests
+        html intermediate output improved 
+        (links and tabletag attributes).
+        footer tag processed in html input.
+Version 7.43
+	* src
+	corrected error due to leftover from tocstype removal
+Version 7.42
+	* src
+	removed dependency to deprecated latex package tocstyle
+Version 7.41
+	* src 
+	optional dependency to libre office and calibe documented 
+Version 7.40
+	* src
+        removing dependency to depricated highlighting-kate
+Version 7.39
+	* src
+        using scrlayer-scrpage instead of scrheadings
+Version 7.39
+	* src
+        linesbreaks in Urls can now be insterted on hyphens. Images in the
+        Gimp format xcf can now be processed. Same for webp images. p
+        html tags now cause new paragraphs. images and as well as
+        rasterized formulars are now properly included in odt 
+        documents and not just referred to.
+Version 7.38
+	* src
+        the tachyon subproject has been started. Its goal is to demostrate
+        the maximum possible speed of a mediawiki to latex conversion see
+        folder tachyon. djvu files are now processed correctly. list of 
+        contributors is faster by removing lazy evaluation. Source codes
+        which contain high unicode codepoint character are not not highlighted
+        anymore and thus don't cause LaTeX compiler aborts anymore. Some 
+        seldom occuring bug in the processing of complex tables have been
+        fixed. highlighting environment now begin with a newline to make sure
+        they compile in LaTeX. A an addition mode has been added to allow
+        for loading all pages from a toc page but only those which are 
+        children of the toc page with respect to the url paths. If a cell in
+        a table itself contains multiple tables, those inner tables are
+        limited in width to half of the width of the outer cell. A bug that
+        prohibited --bookmode together with --epub was fixed. A bug on 
+        nested lists / enumerations / itemizations was fixed. If vector
+        graphcis is requested, the svg images are not rasterized in epub
+        but instead kept as svg in epub output. Quationsmakes and numeric
+        html entities are now correcty coverted from the parse tree to plain
+        text causing them to appear correctly when typesetting source codes.
+        url fed in to mediawiki2latex from the command line of the web 
+        interface may does not longer need to be escaped in url escaping.
+        stl 3d graphics files are kicked out entirely. It is possible to use
+        a source code in the caption of an image.
 Version 7.37
 	* src
         the bug introduced in 7.36 that caused the list of contributors to be 

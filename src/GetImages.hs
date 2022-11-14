@@ -68,7 +68,7 @@ getImagePage ::
              String ->
                WikiUrl -> (Integer, String) -> IO (Maybe ([String], Integer, URL))
 getImagePage dir u (i, ss)
-  = do l <- (mapM (geturl . unify . exportURL . modpath2 ss)
+  = do l <- (mapM (geturl . kds.unify . exportURL . modpath2 ss)
                (parses u))
               :: IO [String]
        let xx = (map (getImageUrl2) (zip l (parses u))) :: [Maybe String]
@@ -86,6 +86,10 @@ getImagePage dir u (i, ss)
   where go :: (URL, Maybe String) -> [(URL, String)]
         go (uu, Just x) = [(uu, x)]
         go _ = []
+        kds ('h':'t':'t':'p':'s':':':'/':'/':xs)=('h':'t':'t':'p':'s':':':'/':'/':(kds xs))
+        kds ('/':'/':xs)='/':(kds xs)
+        kds (x:xs) = x:( kds xs)
+        kds [] = []
 
 {-DHUN| downloads a single image form the wiki.  It takes the temporary image download directory as first parameter. It takes a tuple as second input parameter. The first element of the tuple is the image number so just an integer that can be used to identify the image uniquely) . The second element of the tupele is image include string of the image from the wiki source, that is the text in between the square brackets as second input parameter. It takes the WikiUrl of the wiki websitze currently being processed as thrird parameter. See function getImages in this module for documentation on the returned data type DHUN-}
 

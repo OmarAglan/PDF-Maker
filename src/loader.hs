@@ -54,7 +54,7 @@ main = do a <- getArgs
                                                       selfTest = Nothing,
                                                       outputFilename = "mediawiki2latex.cache",
                                                       inputUrl = (head a) , runMode = ImperativeState.HTML Yes,
-                                                      paper = "A4", vector = False,
+                                                      paper = "A4", ImperativeState.vector = False,
                                                       copy = Nothing,
                                                       mainPath =
                                                         "." ++ (if os == "linux" then "" else "\\"),

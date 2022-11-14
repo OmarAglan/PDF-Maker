@@ -56,7 +56,7 @@ wikiUrl fu = return (url fu, alternatives fu)
 
 data FullWikiUrl = FullWikiUrl{url :: URL, alternatives :: [URL],
                                hostname :: String, lemma :: String}
-                 deriving (Eq, Ord, Serialize, Generic)
+                 deriving (Eq, Ord, Serialize, Generic, Show)
  
 
 {-DHUN| base instance of type FullWikiUrl, to be filled with useful data using the record syntax DHUN-}
@@ -104,7 +104,8 @@ modpathForExpansion u
 geturl :: String -> IO String
 geturl u
   = if u=="" then return ([]) else Control.Exception.catch
-      (do req0 <- parseRequest u
+      (do req1 <- parseRequest u
+          let req0= req1{requestHeaders=(T.hUserAgent,UTF8Str.fromString "mediawiki2latex"): (requestHeaders req1)} 
           let req
                 = ((urlEncodedBody
                      (map (\ (a, b) -> (UTF8Str.fromString a, UTF8Str.fromString b))
@@ -127,7 +128,8 @@ geturl u
 geturl2 :: String -> IO BStr.ByteString
 geturl2 u
   = if u=="" then return (BStr.pack []) else Control.Exception.catch
-      (do req0 <- parseRequest u
+      (do req1 <- parseRequest u
+          let req0= req1{requestHeaders=(T.hUserAgent,UTF8Str.fromString "mediawiki2latex"): (requestHeaders req1)} 
           let req
                 = ((urlEncodedBody
                      (map (\ (a, b) -> (UTF8Str.fromString a, UTF8Str.fromString b))
@@ -149,7 +151,9 @@ geturl2 u
 geturl4 :: String -> String -> IO String
 geturl4 s u
   = if u=="" then return ([]) else Control.Exception.catch
-      (do req1 <- parseRequest (u++"/"++s)
+      (do req2 <- parseRequest (u++"/"++s)
+          let req1= req2{requestHeaders=(T.hUserAgent,UTF8Str.fromString "mediawiki2latex"): (requestHeaders req2)} 
+
           let req0 = req1 {queryString=UTF8Str.fromString "",path=if (head.reverse$ s)=='?' then (UTF8Str.fromString.(++"%3F").UTF8Str.toString) (path req1) else path req1}
           let req
                 = ((urlEncodedBody
@@ -173,7 +177,8 @@ geturl4 s u
 geturl3 :: String -> String -> String -> IO String
 geturl3 u d s
   = if u=="" then return ([]) else Control.Exception.catch
-      (do req0 <- parseRequest u
+      (do req1 <- parseRequest u
+          let req0= req1{requestHeaders=(T.hUserAgent,UTF8Str.fromString "mediawiki2latex"): (requestHeaders req1)} 
           let req
                 = (urlEncodedBody
                      (map (\ (a, b) -> (UTF8Str.fromString a, UTF8Str.fromString b))
@@ -254,14 +259,16 @@ getpage ss u
 
 getBookpage :: String -> WikiUrl -> IO (Maybe String)
 getBookpage ss u
-  = do l <- mapM ((geturl2) . unify)  ((map ((++("/"++ss)).exportURL)) (parses u))
+  = do l <- mapM ((geturl2) . unify)  ((map attach) (map exportURL (parses u)))
        lll <- return (seq l l)
        return $
          (listToMaybe $ concat (map maybeToList (map go lll))) >>=
            (return)
   where
     go x =if (x==(UTF8Str.fromString [])) then Nothing else Just (UTF8Str.toString x)
-
+    attach x = case reverse x of
+                 '/':xs -> ((reverse xs)++("/"++ss))
+                 xs-> ((reverse xs)++("/"++ss))
 
 {-DHUN| Loads the wikitext of an article form a mediawiki server when mediawiki2latex is running with the --mediawiki option. This function downloads the orignial wikitext source without expanding the templates. This is going to happen later by call to getExpandedPage. The first parmeter is lemma to load. The second paramerter is the WikiUrl to the server hosting the wiki. The return value is a pair. The first element of it is the wikitext source of the article. The second element of it is the URL under which the article was downloaded DHUN-}
 

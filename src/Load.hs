@@ -27,7 +27,7 @@ import Control.Monad.Except
 import System.Process
 import HtmlParser (parseHtml)
 import Data.Serialize as S (encode, decode)
-
+import Data.Maybe (fromMaybe)
 
 
 notendyet ::
@@ -155,7 +155,7 @@ runqBookIncludeAction dir
 
 qBookIncludeActionbase :: FullConfig-> WikiUrl -> String ->  ImperativeMonad String
 qBookIncludeActionbase cfg wurl text 
-  =  if isInfixOf "Vorlage" text then return ("{{" ++ text ++ "}}") else if isInfixOf "Category:" text then return ""
+  =  if isInfixOf "Vorlage" text then return ("{{" ++ text ++ "}}") else if (isInfixOf "Category:" text) || (isInfixOf "Kategorie:" text) then return ""
                    else
                      do pp <- (liftIO (print d)) >> myfun
                         case pp of
@@ -186,7 +186,7 @@ qBookIncludeAction :: FullConfig-> WikiUrl -> String ->  ImperativeMonad String
 qBookIncludeAction cfg wurl text 
   = do sst <- get
        case (loadacu sst) of
-        Right _ ->   if isInfixOf "Vorlage" text then return ("{{" ++ text ++ "}}") else if isInfixOf "Category:" text then return "" else
+        Right _ ->   if isInfixOf "Vorlage" text then return ("{{" ++ text ++ "}}") else if (isInfixOf "Category:" text) || (isInfixOf "Kategorie:" text) then return "" else if (noparent cfg) && case text of {'/':_->False; _->True} &&(fromMaybe False (wurl >>= (return.not.((flip Data.List.isPrefixOf) text).(intercalate "/").(Data.List.dropWhile (=="wiki")).(splitOn "/").url_path.fst))) then return "" else
                         do pp <- (liftIO (print d)) >> myfun
                            case pp of
                             Just p -> do _ <- addContributors d Nothing
@@ -194,7 +194,7 @@ qBookIncludeAction cfg wurl text
                                          st <- get
                                          systempdir <- liftIO getTemporaryDirectory
                                          tempdir <- liftIO $ createTempDirectory systempdir "MediaWiki2LaTeXParser"
-                                         --liftIO ( Tools.writeFile (t2empdir </> "input") x)
+                                         liftIO ( Tools.writeFile (tempdir </> "input") x)
                                          _ <- liftIO $ system ("mediawiki2latex -x " ++   (Hex.hex (show (fullconfigbase{compile = Just tempdir, runMode= runMode cfg}))))
                                          case (loadacu st) of
                                           Right base -> do t <- liftIO $ B.readFile (tempdir </> "output")
@@ -202,7 +202,8 @@ qBookIncludeAction cfg wurl text
                                           Left base -> put st{loadacu = Left (tempdir: base)}
                                          return x
                             _ -> return  ""
-        Left _ ->    do systempdir <- liftIO getTemporaryDirectory
+        Left _ -> if isInfixOf "Vorlage" text then return ("{{" ++ text ++ "}}") else if (isInfixOf "Category:" text) || (isInfixOf "Kategorie:" text) then return "" else if (noparent cfg)&& case text of {'/':_->False; _->True} && (fromMaybe False (wurl >>= (return.not.((flip Data.List.isPrefixOf) text).(intercalate "/").(Data.List.dropWhile (=="wiki")).(splitOn "/").url_path.fst))) then return "" else
+                     do systempdir <- liftIO getTemporaryDirectory
                         tempdir <- liftIO $  createTempDirectory systempdir "MediaWiki2LaTeXBook"
                         liftIO $ B.writeFile (tempdir </> "bookinput") (S.encode (cfg,wurl,text,loadacu sst,audict sst,fullUrl sst))
                         _ <- liftIO $ system ("mediawiki2latex -x " ++  (Hex.hex (show (fullconfigbase{convert = Just (NewLoad tempdir)}))))
@@ -369,7 +370,7 @@ getContributors u
 
 addContributors ::
                 [Char] -> Maybe URL -> ImperativeMonad ((Maybe String))
-addContributors theLemma uu
+addContributors theLemma uu 
   = do sst <- get
        let st = fullUrl sst
        thetheLemma <- liftIO $ return theLemma
@@ -399,6 +400,7 @@ addContributors theLemma uu
           = case xx of
                 Nothing -> Just Contributor{name = a, href = h, edits = e}
                 Just old -> Just old{edits = (edits old) + e}
+
 
 noinclude :: t -> String -> ImperativeMonad [Char]
 noinclude wurl
