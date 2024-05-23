@@ -341,6 +341,31 @@ htmlchars
      ("rarr", "{\\mbox{$\\rightarrow$}}"),
      ("darr", "{\\mbox{$\\downarrow$}}"),
      ("harr", "{\\mbox{$\\leftrightarrow$}}"),
+     ("varr", "{\\mbox{$\\updownarrow$}}"),
+     
+     ("8658", "{\\mbox{$\\Leftarrow$}}"),
+     ("8657", "{\\mbox{$\\Uparrow$}}"),
+     ("8656", "{\\mbox{$\\Rightarrow$}}"),
+     ("8659", "{\\mbox{$\\Downarrow$}}"),
+     ("8660", "{\\mbox{$\\Leftrightarrow$}}"),
+     ("8661", "{\\mbox{$\\Updownarrow$}}"),
+     
+     ("8592", "{\\mbox{$\\leftarrow$}}"),
+     ("8593", "{\\mbox{$\\uparrow$}}"),
+     ("8594", "{\\mbox{$\\rightarrow$}}"),
+     ("8595", "{\\mbox{$\\downarrow$}}"),
+     ("8596", "{\\mbox{$\\leftrightarrow$}}"),
+     ("8597", "{\\mbox{$\\updownarrow$}}"),
+     
+     
+     ("lArr", "{\\mbox{$\\Leftarrow$}}"),
+     ("uArr", "{\\mbox{$\\Uparrow$}}"),
+     ("rArr", "{\\mbox{$\\Rightarrow$}}"),
+     ("dArr", "{\\mbox{$\\Downarrow$}}"),
+     ("hArr", "{\\mbox{$\\Leftrightarrow$}}"),
+     ("vArr", "{\\mbox{$\\Updownarrow$}}"),
+     
+     
      ("#160", "{\\mbox{$~$}}"), ("nbsp", "{\\mbox{$~$}}"),
      ("#162", "{\\mbox{$\\cent$}}"), ("cent", "{\\mbox{$\\cent$}}"),
      ("#163", "{\\mbox{$\\pounds$}}"), ("#165", "{\\mbox{$\\yen$}}"),
@@ -533,16 +558,16 @@ removePrintVersion lem
 
 goodtags1 :: [[Char]]
 goodtags1
-  = ["templatestyles", "includeonly", "references", "blockquote", "noinclude",
+  = ["templatestyles", "includeonly", "references", "blockquote", "noinclude", "figcaption",
      "noframes", "frameset", "colgroup", "fieldset", "basefont",
      "!DOCTYPE", "noscript", "address", "acronym", "caption", "strong",
-     "applet", "script", "button", "select", "section", "legend", "footer",
+     "applet", "script", "button", "select", "section", "legend", "footer", "figure","header",
      "strike", "object", "input", "center", "legend", "iframe", "small",
      "video", "audio", "style", "input", "label", "tbody", "thead",
-     "title", "track" ,"frame", "param", "base", "area", "font", "code", "span",
+     "title", "track" ,"frame", "param", "base", "area", "font", "code", "span", "main",
      "abbr", "body", "link", "menu", "math", "meta", "samp", "cite",
-     "head", "html", "poem", "form", "cite", "ref", "div", "pre", "sub",
-     "sup", "big", "del", "map", "bdo", "var", "dfn", "kbd", "col",
+     "head", "html", "form", "cite", "ref", "div", "pre", "sub", "nav",
+     "sup", "big", "del", "map", "bdo", "var", "dfn", "kbd", "col", "wbr",
      "ins", "bdi", "dir", "img", "h1", "h2", "h3", "h4", "h5", "h6",
      "li", "ul", "ol", "tt", "dd", "dl", "dt", "hr", "em", "b", "i",
      "s", "u", "p", "q", "a"]
@@ -597,6 +622,7 @@ chartransforlink '$' = "\\${}"
 chartransforlink '\\' = "\\textbackslash{}"
 chartransforlink '<' = "<{}"
 chartransforlink '>' = ">{}"
+chartransforlink '^' = "\\%5E"
 chartransforlink c
   | 127 < ord c =
     concat (map chartransforlink $ escapeURIString (const False) [c])

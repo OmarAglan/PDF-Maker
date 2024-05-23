@@ -192,9 +192,9 @@ This code example uses #1 Syntax
 
 }
 
-\newcommand{\LaTeXLatinExcerciseTemplate}[3]{
+\newcommand{\LaTeXLatinExerciseTemplate}[3]{
 
-\definecolor{shadecolor}{gray}{0.9}\begin{myshaded}{\bfseries Excercise: #1} \\
+\definecolor{shadecolor}{gray}{0.9}\begin{myshaded}{\bfseries Exercise: #1} \\
 #2 \\
 {\bfseries Solution}
 #3
@@ -204,9 +204,11 @@ This code example uses #1 Syntax
 
 
 \newcommand{\LaTeXShadedColorBoxTemplate}[2]{
-{\linewidth}#1\begin{myshaded}
+\begin{minipage}{\linewidth}
+#1\begin{myshaded}
 #2
 \end{myshaded}
+\end{minipage}
 }
 
 \newcommand{\PGP}[1]{PGP:#1}

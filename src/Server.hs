@@ -232,7 +232,7 @@ progressBar t sub
                              pageFrame $
                                infoBox
                                  (if not (member theIndex m) then
-                                    "Not enough resources availiable to process your request! Your request has been dropped! Please download the full version for free and run it on your own computer!"
+                                    "Not enough resources available to process your request! Your request has been dropped! Please download the full version for free and run it on your own computer!"
                                     else
                                     (if not (failed uu) then "Conversion Running" else
                                        "Conversion Failed due to timeout or non zero exit code"))
@@ -361,6 +361,13 @@ formPage m s
                                                      H.option H.! A.value "legal" $ "Legal"
                                                      H.option H.! A.value "executive" $ "Executive"
                                       H.tr $
+                                        do H.td "Table typesetting"
+                                           H.td $
+                                             do H.select H.! A.style wwidth H.! A.name "table" $
+                                                  do H.option H.! A.value "Chromium" $ "Chromium"
+                                                     H.option H.! A.value "LaTeX" $
+                                                       "LaTeX"
+                                      H.tr $
                                         do H.td "Vector graphics"
                                            H.td $
                                              do H.select H.! A.style wwidth H.! A.name "vector" $
@@ -397,6 +404,7 @@ formPage m s
           = do msg <- lookBS "msg"
                paperOpt <- lookBS "paper"
                vectorOpt <- lookBS "vector"
+               tableOpt <- lookBS "table"
                expansion <- lookBS "expansion"
                output <- lookBS "output"
                zzz <- liftIO $
@@ -434,7 +442,8 @@ formPage m s
                                                      if (toString (toStrict output)) == "odt" then
                                                        ImperativeState.OdtFile else
                                                        ImperativeState.PlainPDF,
-                                               compile = Nothing, imgctrb = Nothing,  convert=Nothing, noparent= "BookNoParent" == (toString (toStrict expansion))}
+                                               compile = Nothing, convert=Nothing, noparent= "BookNoParent" == (toString (toStrict expansion)), imgctrburl=Nothing,ctrb=Nothing,latexTables = ((toString (toStrict tableOpt)) ==
+                                                   "LaTeX" )}
                            yy <- newEmptyMVar
                            mm <- takeMVar m
                            _ <- if ((currentlyrunning mm)<=3) then

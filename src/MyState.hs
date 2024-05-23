@@ -45,8 +45,8 @@ data MyState = MyState{getImages :: [String], getJ :: Int,
                        currentUrl :: String, fndict :: Map String [Anything Char],
                        tablist :: [[String]], tabmap :: Map Int (Map Int Double),
                        fontStack :: [FontStyle], font :: Font, langu :: Maybe String,
-                       forms :: Map String Int, lastChar :: Char, lastFontChanged :: Bool, getInCaption :: Bool, vector:: Bool}
-             deriving (Show, Eq, Read, Serialize, Generic)
+                       forms :: Map String Int, lastChar :: Char, lastFontChanged :: Bool, getInCaption :: Bool, vector:: Bool, htmlTables :: [String], latexTabs :: Bool, htmlMaps::[String]}
+             deriving (Show, Eq, Serialize, Generic)
 
 {-DHUN| Renderer is the State monad using MyState as mutable state DHUN-}
 
@@ -66,27 +66,29 @@ initialState
             fontStack =
               [FontStyle{stylebase = Normal, bold = False, italic = False}],
             font = ComputerModernRoman, langu = Nothing, forms = Map.empty,
-            lastChar = ' ', lastFontChanged = False, getInCaption=False, vector=False}
+            lastChar = ' ', lastFontChanged = False, getInCaption=False, vector=False,htmlTables=[], latexTabs=False,htmlMaps=[]}
 
 {-DHUN| represents an URL to a wiki (not to a page thereof), which is not a sister project of wikipedia, so not wikibooks wikisource, etc. DHUN-}
 
 data WikiBaseUrl = WikiBaseUrl{baseUrl :: String}
-                 deriving (Show, Eq, Read, Serialize, Generic)
+                 deriving (Show, Eq, Serialize, Generic)
 
 {-DHUN| represents an URL to a wiki (not to a page thereof), which is a sister project of wikipedia, so wikibooks wikisource, etc. DHUN-}
 
 data WikiUrlInfo = WikiUrlInfo{language :: String,
                                wikitype :: String}
-                 deriving (Show, Eq, Read, Serialize, Generic)
+                 deriving (Show, Eq, Serialize, Generic)
 
 {-DHUN| represents an URL to a wiki (not to a page thereof), which is either a sister project of wikipedia, so wikibooks wikisource, etc. or isn't a sister project of wikipedia DHUN-}
 
 data WikiUrlData = BaseUrl WikiBaseUrl
                  | UrlInfo WikiUrlInfo
-                 deriving (Show, Eq, Read, Serialize, Generic)
+                 deriving (Show, Eq, Serialize, Generic)
 
 {-DHUN| represents an URL to a page on a wiki DHUN-}
 
 data WikiLinkInfo = WikiLinkInfo{urldata :: WikiUrlData,
                                  page :: String}
-                  deriving (Show, Eq, Read, Serialize, Generic)
+                  deriving (Show, Eq, Serialize, Generic)
+                  
+

@@ -25,7 +25,7 @@ makeUrl2 theLemma theHost
   = (unify . exportURL)
       (URL{url_path = "w/index.php",
            url_params =
-             [("title", (replace2 theLemma "%" "%25")), ("offset", ""),
+             [("title", (replace2 (replace2 theLemma "%27" "'") "%" "%25")), ("offset", ""),
               ("limit", "500000"), ("action", "history")],
            url_type =
              Absolute
@@ -40,7 +40,7 @@ makeUrl4 uuu
             (unify . exportURL)
               (URL{url_path = (url_path uu),
                    url_params =
-                     [("title", (replace2 ti "%" "%25")), ("offset", ""),
+                     [("title", (replace2 (replace2 ti "%27" "'") "%" "%25")), ("offset", ""),
                       ("limit", "500000"), ("action", "history")],
                    url_type = url_type uu}))
 
@@ -60,22 +60,30 @@ deepGet2 tag ll = concat $ map go ll
         go (Environment _ _ l) = (deepGet2 tag l)
         go _ = []
 
+
+
 getLicense :: [Anything Char] -> Maybe [Char]
-getLicense l = (go l)
+getLicense l = (go (killTree l))
   where go :: [Anything Char] -> Maybe String
         go ll = msum (map (dg ll) licenses)
         dg ll (x, c)
           = case deepGet "a" "href" x ll of
                 (_ : _) -> Just c
                 _ -> Nothing
+        killTree ll = concat (map killNode ll)
+
+        killNode (Environment Tag (TagAttr "footer" _) _) =[]
+        killNode (Environment x y ll)
+          = [Environment x y (killTree ll)]
+        killNode x = [x]
 
 getAuthor :: [Anything Char] -> Maybe [Anything Char]
 getAuthor x = listToMaybe (concat (map go (deepGet2 "tr" x)))
   where go (Environment _ _ l)
-          = let gg = (deepGet "td" "id" "fileinfotpl_aut" l) in
+          = let gg = (deepGet "td" "id" "fileinfotpl_aut" l)++ (deepGet "th" "id" "fileinfotpl_aut" l)in
               case gg of
                   (f : _) -> case delete f (deepGet2 "td" l) of
-                                 [Environment _ _ ll] -> [ll]
+                                 ((Environment _ _ ll) : _) -> [ll]
                                  _ -> []
                   _ -> []
         go _ = []

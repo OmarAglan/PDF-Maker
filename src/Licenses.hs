@@ -1,19 +1,26 @@
 {-DHUN| module storing information on image licensing on wikipedia wikimedia commons and so on. DHUN-}
 module Licenses where
-
+import Data.List (nub)
 {-DHUN| a map (written as list) to map an url to a license to an abbriviated text of the license. In contrast to the map minlicenses in this module the presence of a leading http: is optional DHUN-}
 
 licenses :: [(String, String)]
-licenses = minlicenses ++ (map go minlicenses)
+licenses =nub$ minlicenses ++ (map go minlicenses) ++(map gog minlicenses)++(map gogo minlicenses)++(map gogogo minlicenses)
   where go :: (String, String) -> (String, String)
         go (x, y) = ((drop 5) x, y)
-
+        gog (x, y) = ((drop 6) x, y)
+        gogo ('h':'t':'t':'p':'s':':':'/':'/':'e':'n':'.':'w':'i':'k':'i':'p':'e':'d':'i':'a':'.':'o':'r':'g':xs, y) = ( xs, y)
+        gogo x=x
+        gogogo ('h':'t':'t':'p':':':'/':'/':xs,y) = ( "https://"++xs, y)
+        gogogo x=x
 {-DHUN| a map (written as list) to map an url to a license to an abbriviated text of the license DHUN-}
 
 minlicenses :: [(String, String)]
 minlicenses
   = [("http://en.wikipedia.org/wiki/public_domain", "PD"),
      ("https://en.wikipedia.org/wiki/Public_domain", "PD"),
+     ("https://en.wikipedia.org/wiki/en:Public_domain", "PD"),
+     ("https://en.wikipedia.org/wiki/en:public_domain", "PD"),
+     ("https://creativecommons.org/licenses/publicdomain/", "PD"),
      ("https://de.wikibooks.org/wiki/GNU_Freie_Dokumentationslizenz",
       "GFDL"),
      ("https://de.wikipedia.org/wiki/GNU-Lizenz_f%C3%BCr_freie_Dokumentation",
@@ -22,12 +29,15 @@ minlicenses
       "GFDL"),
      ("http://en.wikipedia.org/wiki/en:GNU_Free_Documentation_License",
       "GFDL"),
+     ("https://en.wikipedia.org/wiki/de:GNU-Lizenz_f%C3%BCr_freie_Dokumentation",
+      "GFDL"),
      ("http://en.wikipedia.org/wiki/en:GNU_General_Public_License",
       "GPL"),
      ("http://de.wikipedia.org/wiki/GNU_General_Public_License", "GPL"),
      ("http://de.wikipedia.org/wiki/Gemeinfreiheit", "PD"),
      ("http://en.wikipedia.org/wiki/de:Gemeinfreiheit", "PD"),
      ("http://de.wikipedia.org/wiki/Gemeinfreiheit", "PD"),
+     ("https://de.wikipedia.org/wiki/Gemeinfreiheit", "PD"),
      ("http://en.wikipedia.org/wiki/en:GNU_Lesser_General_Public_License",
       "LGPL"),
      ("http://creativecommons.org/licenses/by/3.0/deed.en",
@@ -48,9 +58,13 @@ minlicenses
       "CC-BY-3.0"),
      ("http://creativecommons.org/licenses/by/3.0/us/deed.en",
       "CC-BY-3.0"),
+     ("https://creativecommons.org/licenses/by/3.0/deed.de",
+      "CC-BY-3.0"),
      ("http://creativecommons.org/licenses/by-sa/3.0/deed.en",
       "CC-BY-SA-3.0"),
      ("http://creativecommons.org/licenses/by-sa/3.0/deed.de",
+      "CC-BY-SA-3.0"),
+     ("https://creativecommons.org/licenses/by-sa/3.0/de/legalcode",
       "CC-BY-SA-3.0"),
      ("https://creativecommons.org/licenses/by-sa/3.0/deed.de",
       "CC-BY-SA-3.0"),
@@ -88,6 +102,10 @@ minlicenses
       "CC-BY-2.5"),
      ("http://creativecommons.org/licenses/by/2.5/au/deed.en",
       "CC-BY-2.5"),
+     ("https://creativecommons.org/licenses/by/2.5/bg/deed.de",
+      "CC-BY-2.5"),
+     ("https://creativecommons.org/licenses/by-sa/2.5/deed.de",
+      "CC-BY-SA-2.5"),
      ("http://creativecommons.org/licenses/by-sa/2.5/deed.en",
       "CC-BY-SA-2.5"),
      ("http://creativecommons.org/licenses/by-sa/2.5/deed.de",
@@ -116,6 +134,8 @@ minlicenses
       "CC-BY-SA-2.5"),
      ("http://creativecommons.org/licenses/by-sa/2.5/za/deed.en",
       "CC-BY-SA-2.5"),
+     ("https://creativecommons.org/licenses/by-sa/2.0/de/deed.de",
+      "CC-BY-SA-2.0"),
      ("http://commons.wikimedia.org/wiki/Template:Cc-by-2.0",
       "CC-BY-2.0"),
      ("http://creativecommons.org/licenses/by/2.0/at/deed.en",
@@ -123,6 +143,10 @@ minlicenses
      ("http://creativecommons.org/licenses/by/2.0/de/deed.en",
       "CC-BY-2.0"),
      ("http://creativecommons.org/licenses/by/2.0/kr/deed.en",
+      "CC-BY-2.0"),
+     ("https://creativecommons.org/licenses/by/2.0/deed.de",
+      "CC-BY-2.0"),
+     ("https://creativecommons.org/licenses/by/2.0/deed.en",
       "CC-BY-2.0"),
      ("http://creativecommons.org/licenses/by-sa/2.0/deed.en",
       "CC-BY-SA-2.0"),
@@ -143,4 +167,15 @@ minlicenses
      ("http://creativecommons.org/licenses/by-sa/2.0/uk/deed.en",
       "CC-BY-SA-2.0"),
      ("http://creativecommons.org/licenses/sa/1.0/", "CC-SA-1.0"),
-     ("http://creativecommons.org/publicdomain/zero/1.0/deed.en", "PD")]
+     ("https://creativecommons.org/licenses/by/1.0/deed.en", "CC-BY-1.0"),
+     ("http://creativecommons.org/publicdomain/zero/1.0/deed.en", "PD"),
+     ("https://de.wikipedia.org/wiki/Public_domain","PD"),
+     ("https://commons.wikimedia.org/wiki/Public_domain","PD"),
+     ("https://creativecommons.org/publicdomain/zero/1.0/deed.de","PD"),
+     ("https://de.wikipedia.org/wiki/Gemeinfreiheit","PD"),
+     ("https://de.wikipedia.org/wiki/Gemeinfreiheit#Public_Domain","PD"),
+     ("https://en.wikipedia.org/wiki/de:Gemeinfreiheit","PD"),
+     ("https://creativecommons.org/licenses/by-sa/4.0/deed.de","CC-BY-SA-4.0"),
+     ("https://creativecommons.org/licenses/by-sa/4.0/deed.en","CC-BY-SA-4.0"),
+     ("https://creativecommons.org/licenses/by/4.0/deed.de","CC-BY-4.0")
+     ]

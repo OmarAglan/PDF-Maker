@@ -1,3 +1,95 @@
+Version 8.7
+        * src
+        images containing a question mark character work again
+        broken pdfs are fixed by pdftk before inclusion
+        rendering of svg switched back from imagemagick to rsvg
+        colored boxes are not allowed to auto-page-break anymore
+Version 8.6
+        * src
+        maps are now rendered, if mediawiki2latex runs inside wmf site, 
+        otherwise maps turn into broken images, xelatex has been 
+        replaced by lualatex unifont.ttf replaced with unifont.otf
+        added cc-by-1.0 and cc public domain as possible image license, 
+        double circumflex now correctly escaped in LaTeX, %27 url now
+        properly convertet to ', djvu files can now use pageref, svg 
+        rastering now done by imagemagick, more tolerant to incorrect
+        svgs, the inclusion of templates refering each other
+        recursively is now stopped after one iteration, corrected 
+        a bug about inclusion of subpages with {{:mypage}} at 
+        deep nesting level.
+Version 8.5
+        * src
+        typos discovered by Debian lintian fixed. State serialization now
+        by cereal. latex rendering of tables works again in bookmode
+        page title heading now transferred into latex document 
+Version 8.4
+        * src
+        authors of images inside html tables now propperly attibuted
+        http status code 429 now excessivy retried 
+Version 8.3
+        * src
+        tables are now transferred verbatim when chromium renderig is
+        requested
+        chromium rendering is by default enabled in the browser and
+        disabled in the webinterface. It can be enabled by -a
+        command line switch and disabled by the -e command line
+        switch. Output of cromium and pdfcrop is now suppressed
+        fixing a problem when rendering large books from the
+        webinterface
+Version 8.2
+        * src
+        improved image author and license determination
+        add wbr html tag
+        fixed a bug about missing colors of boxes that caused
+        LaTeX compilation to fail
+        tables are now rendered by chromium
+        curl now does five retries when downloading data
+Version 8.1
+        * src
+        improved image author and license determination
+Version 8.0
+        * src
+        downloads of images and relateed information
+        now use curl http2 multiplexing and compression
+        list of figures now as html code in html output
+        mediawiki2latex runs a factor of 4 to 5 faster
+Version 7.53
+        * src
+        fixing empty document error on wiki pages that contained an
+        empty toc in the lower left corner of the webpage
+Version 7.52
+        * src
+        image desciptions in html mode now work with new wikipedia
+        website layout
+Version 7.51
+        * src
+        fixing latex error message for no line here to end 
+        in citations inside lists
+        removing superflous tables
+        removal of superfluous content introduced by
+        new wikipedia website layout
+        added link and img tags be allowed to also closed
+        with > instead of />
+Version 7.50
+        * src
+        removal of superfluous content introduced by 
+        new wikipedia website layout
+Version 7.49
+        * src
+        removal of superfluous content introduced by 
+        new wikipedia website layout
+Version 7.48
+        * src
+        fix for figure processing in german wikibooks
+Version 7.47
+        * src
+        removal of superfluous content introduced by 
+        new wikipedia website layout
+Version 7.46
+        * src
+        new tag "templatestyles" added to parser
+        fixed bug about wrongly intermixed latex in html output
+        fixed bug about rowspan in tables for latex output
 Version 7.45
         * src
         remove navigation toolsbars

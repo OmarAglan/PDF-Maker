@@ -6,7 +6,6 @@ import MyState
 import MediaWikiParseTree
 import MediaWikiParser
 import LatexRenderer
-import HtmlRenderer
 import Tools
 import System.FilePath.Posix
 import qualified Data.Map as Map
@@ -29,7 +28,8 @@ runCompile dir cfg
        p <- return $ case runMode cfg of
                        (HTML _) -> minparsers
                        _ -> parsers
-       cr <- return (printPrepareTree (parseit p t))
+       st <- lift get
+       cr <- return (printPrepareTree (not (latexTable st)) (parseit p t))
        liftIO $ B.writeFile (dir </> "output") (encode cr)
 
 
@@ -37,8 +37,10 @@ runNewTree :: String -> ImperativeMonad ()
 runNewTree dir 
   = do t <- liftIO $ B.readFile (dir </> "output")
        let tr=(case S.decode t of {Right k->k::[Anything Char];_->[]}) 
-       intus <- liftIO $ Tools.readFile (dir </> "intus")
-       let us = read intus
+       intus <- liftIO $ B.readFile (dir </> "intus")
+       let us = case decode intus of 
+                  Right r -> r
+                  _ -> error "Could not read State intus"
        let (nus,ntr) = makeLables tr us
        liftIO $ B.writeFile (dir </> "newtree") (encode ntr)
        liftIO $ B.writeFile (dir </> "us") (encode nus)
@@ -48,12 +50,15 @@ runTreeToLaTeX :: String ->String->  ImperativeMonad ()
 runTreeToLaTeX instfn dir 
   = do t <- liftIO $ B.readFile (dir </> "newtree")
        let l=(case S.decode t of {Right k->k;_->[]}) 
-       inst <- liftIO $ Tools.readFile (instfn </> "inst")
-       let st = read inst
+       inst <- liftIO $ B.readFile (instfn </> "inst")
+       let st = case decode inst of 
+                  Right r -> r
+                  _ -> error "Could not read State inst"
+                       
        let (ltx,newst) = runState (treeToLaTeX2 l) st
        liftIO $ B.writeFile (dir </> "ltx") (encode (ltx::String))
        liftIO $ B.writeFile (dir </> "st") (encode newst)
-       liftIO $ Tools.writeFile (dir </> "inst") (show newst)
+       liftIO $ B.writeFile (dir </> "inst") (encode newst)
 
 
 
@@ -66,9 +71,9 @@ compile ::
               [[ByteString]] ->
                 String ->
                   Maybe String ->
-                    Map.Map String Int -> Bool -> ImperativeMonad CompileResult
+                    Map.Map String Int -> Bool -> Maybe String->Bool->ImperativeMonad CompileResult
 compile theRunMode text templates tabs mytitle mylanguage formulas
-  b
+  b lang latexTabels
   = do st <- get
        case theRunMode of
            StandardTemplates No -> return
@@ -77,33 +82,33 @@ compile theRunMode text templates tabs mytitle mylanguage formulas
                                        (hostname . fullUrl $ st)
                                        templates
                                        tabs
-                                       formulas (vectorr st))
+                                       formulas (vectorr st) lang latexTabels)
            UserTemplateFile No _ -> return
                                       (run b mylanguage mytitle (parseit parsers text)
                                         (parseit parsers text)
                                         (hostname . fullUrl $ st)
                                         templates
                                         tabs
-                                        formulas (vectorr st))
-           HTML No  -> do --liftIO (Tools.writeFile "/home/dirk/dhudhu" (show (printPrepareTree(parseit minparsers text))))
+                                        formulas (vectorr st) lang latexTabels)
+           HTML No  -> do --liftIO (Tools.writeFile "/home/dirk/dhudhu" (show (printPrepareTree (not latexTabels) (parseit minparsers text))))
                           return
                            (run b mylanguage mytitle
-                            (printPrepareTree (parseit minparsers text))
-                            (printPrepareTree (parseit minparsers text))
+                            (printPrepareTree (not latexTabels) (parseit minparsers text))
+                            (printPrepareTree (not latexTabels) (parseit minparsers text))
                             (hostname . fullUrl $ st)
                              templates
                              tabs
-                             formulas (vectorr st))
+                             formulas (vectorr st) lang latexTabels)
            ExpandedTemplates No -> do return
                                        (run b mylanguage mytitle (parseit parsers text)
                                         (parseit parsers text)
                                         (hostname . fullUrl $ st)
                                         templates
                                         tabs
-                                        formulas (vectorr st))
+                                        formulas (vectorr st)lang latexTabels)
            _ -> do case loadacu st of 
-                       Right pt -> return  (run b mylanguage mytitle pt pt  (hostname . fullUrl $ st)   templates tabs  formulas (vectorr st))
-                       Left pt -> (runcheap b mylanguage mytitle pt  (hostname . fullUrl $ st)   templates tabs  formulas theRunMode)
+                       Right pt -> return  (run b mylanguage mytitle pt pt  (hostname . fullUrl $ st)   templates tabs  formulas (vectorr st) lang latexTabels)
+                       Left pt -> (runcheap b mylanguage mytitle pt  (hostname . fullUrl $ st)   templates tabs  formulas theRunMode latexTabels)
 
 {-DHUN| pathname of the temporary directory of the compiler |DHUN-}
 
@@ -118,18 +123,18 @@ shortparse x
        return (parseit parsers x)
 
 {-DHUN| return a parse tree of a source file. The first argument is the source file. The second argument is a list of command line parameter. If it contains the keyword print. The source file is understood to be the HTML code returned by mediawiki when being requested for the print version of a wiki page, otherwise it is understood to be the wiki source code of a wiki page, that is what you get when issuing a Special:Export request to mediawiki. This function return a parse tree ready to be turned into a latex document by treeToLaTeX3 |DHUN-}
-
+{-
 getparse :: String -> [String] -> IO [Anything Char]
 getparse x args
   = if ("print" `elem` args) then printparse x else shortparse x
-
+-}
 {-DHUN| prepares a HTML document received from mediawiki when requesting it for the print version of a wiki page to a parse tree to be converted to LaTeX be treeToLaTeX3. It also signals to compiler.py that the source code was read using the temporary compiler directory |DHUN-}
-
+{-
 printparse :: String -> IO [Anything Char]
 printparse x
   = do Tools.writeFile (dirpref ++ "done") ""
        return (printPrepareTree (parseit minparsers x))
-
+-}
 {-DHUN| the pathname of the temporary directory |DHUN-}
 
 tmppath :: [Char]
@@ -166,7 +171,7 @@ postproctabmap m = Map.map f m
 
 data CompileResult = CompileResult{images :: [String],
                                    body :: String, tablelist :: [[String]],
-                                   galleryNumbers :: [Integer], title :: String, html :: String}
+                                   galleryNumbers :: [Integer], title :: String, html :: String, theHtmlTabs::[String], theHtmlMaps::[String]}
                    deriving Show
 
 {-DHUN| the first parameter is the parse tree created by get parse of the document currently being processed. the second parameter is the URL under which the document was downloaded. the third parameter is the netloc describing the wiki this page belongs to. The fourth parameter is a mapping file defined by the user for the mapping of mediawiki templates to latex commands. the fifth parameter is a possible parse tree created by precious run the the should be added before the begging of the newly created parse tree. This function writes out all results to temporary files that will be further processed by compiler.py DHUN-}
@@ -178,15 +183,15 @@ run ::
           [Anything Char] ->
             [Anything Char] ->
               String ->
-                String -> [[ByteString]] -> Map.Map String Int -> Bool ->CompileResult
-run bb mylanguage mytitle parsetree parsetree2 netloc tmpl 
-  someTables formulas vec
+                String -> [[ByteString]] -> Map.Map String Int -> Bool ->Maybe String->Bool->CompileResult
+run bb mylanguage mytitle parsetree parsetree2 netloc tmpl
+  someTables formulas vec lang latexTabels
   = CompileResult{images = img, body = bdy, tablelist = theTables,
                   galleryNumbers = gals, title = tit,
-                  html = if bb then trda3 else []}
+                  html = if bb then trda3 else [],theHtmlTabs =htmlTabs, theHtmlMaps=htmlMs}
   where alldata2 g u
           = (treeToLaTeX3 ((snd . newtree $ g))
-               initialState{urld = analyseNetloc netloc}{tabmap = u,
+               initialState{urld = analyseNetloc netloc}{langu=lang, tabmap = u,
                                                          templateMap =
                                                            getUserTemplateMap
                                                              (read tmpl :: [[String]])}{urls =
@@ -194,10 +199,10 @@ run bb mylanguage mytitle parsetree parsetree2 netloc tmpl
                                                                                             .
                                                                                             fst .
                                                                                               newtree
-                                                                                            $ g})
+                                                                                            $ g, latexTabs=latexTabels})
         alldata3 g u
           = (treeToHtml3 formulas mylanguage mytitle ((snd . newtree $ g))
-               initialState{urld = analyseNetloc netloc}{MyState.vector=vec, tabmap = u,
+               initialState{urld = analyseNetloc netloc}{langu=lang,MyState.vector=vec, tabmap = u,
                                                          templateMap =
                                                            getUserTemplateMap
                                                              (read tmpl :: [[String]])}{urls =
@@ -205,7 +210,7 @@ run bb mylanguage mytitle parsetree parsetree2 netloc tmpl
                                                                                             .
                                                                                             fst .
                                                                                               newtree
-                                                                                            $ g})
+                                                                                            $ g, latexTabs=latexTabels})
         newtree g = makeLables g initialUrlState
         tm = (postproctabmap (maketabmap theNewSizes Map.empty))
         (trda, trst) = (alldata2 parsetree tm)
@@ -215,6 +220,8 @@ run bb mylanguage mytitle parsetree parsetree2 netloc tmpl
         bdy = doUnicode trda
         gals = getGalleryNumbers trst
         tit = getTitle trst
+        htmlTabs = htmlTables trst
+        htmlMs = htmlMaps trst
         
         fun :: ByteString -> Double
         fun x
@@ -234,14 +241,14 @@ runcheap ::
         String ->
           [String] ->
               String ->
-                String -> [[ByteString]] -> Map.Map String Int -> RunMode ->ImperativeMonad CompileResult
+                String -> [[ByteString]] -> Map.Map String Int -> RunMode ->Bool->ImperativeMonad CompileResult
 runcheap _ _ _ input netloc tmpl
-  someTables _ theRunMode
+  someTables _ theRunMode theLatexTables
   = do ntree<-labelit input
 
                           
 
-       trst<-ttl3 initialState{urld = analyseNetloc netloc}{tabmap = tm,
+       trst<-ttl3 initialState{ latexTabs=theLatexTables,urld = analyseNetloc netloc}{tabmap = tm,
                                                          templateMap =
                                                            getUserTemplateMap
                                                              (read tmpl :: [[String]])}{urls =
@@ -256,22 +263,22 @@ runcheap _ _ _ input netloc tmpl
         
        return CompileResult{images = img, body = bdy, tablelist = theTables,
                   galleryNumbers = gals, title = tit,
-                  html = []}
+                  html = [],theHtmlTabs=htmlTables trst, theHtmlMaps=htmlMaps trst}
   where 
         labelit g= foldM labelloc initialUrlState g
-        labelloc us fn = do _ <- liftIO $ Tools.writeFile (fn </> "intus") (show us)
+        labelloc us fn = do _ <- liftIO $ B.writeFile (fn </> "intus") (encode us)
                             _ <- liftIO $
                                   system
                                    ("mediawiki2latex -x " ++
-                                      (Hex.hex (show (fullconfigbase{convert = Just (NewTree fn), runMode= theRunMode}))))
+                                      (Hex.hex (show (fullconfigbase{convert = Just (NewTree fn), runMode= theRunMode,latexTables=theLatexTables}))))
                             t <- liftIO $ B.readFile (fn </> "us")
                             case S.decode t of 
                                Right nus->return (nus::UrlState)
-                               _->return us
+                               _-> error "could not read state nus"
         treeToLaTeX2ext instfn fn = do _ <-liftIO $
                                         system
                                          ("mediawiki2latex -x " ++
-                                            (Hex.hex (show (fullconfigbase{convert = Just (TreeToLaTeX instfn fn), runMode= theRunMode}))))
+                                            (Hex.hex (show (fullconfigbase{convert = Just (TreeToLaTeX instfn fn), runMode= theRunMode,latexTables=theLatexTables}))))
                                        return ()
 
 
@@ -293,11 +300,11 @@ runcheap _ _ _ input netloc tmpl
         ttl3 st g = do systempdir <- liftIO getTemporaryDirectory
                        tempdir <- liftIO $
                          createTempDirectory systempdir "MediaWiki2LaTeXStateIO"
-                       liftIO (Tools.writeFile (tempdir </> "inst") (show st))                                                        
+                       liftIO (B.writeFile (tempdir </> "inst") (encode st))                                                        
                        sst <- fullttl tempdir g
                        tempdir2 <- liftIO $
                          createTempDirectory systempdir "MediaWiki2LaTeXStateIO"
-                       liftIO (Tools.writeFile (tempdir2 </> "inst") (show st{fndict = fndict sst}))                                                        
+                       liftIO (B.writeFile (tempdir2 </> "inst") (encode st{fndict = fndict sst}))                                                        
                        fullttl tempdir2 g
 
         tm = (postproctabmap (maketabmap theNewSizes Map.empty))

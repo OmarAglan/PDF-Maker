@@ -108,7 +108,7 @@ getttf FreeSerifBoldItalic
   = "/usr/share/fonts/truetype/freefont/FreeSerifBoldItalic.ttf"
 getttf FreeSerifItalic
   = "/usr/share/fonts/truetype/freefont/FreeSerifItalic.ttf"
-getttf GnuUnifont = "/usr/share/fonts/truetype/unifont/unifont.ttf"
+getttf GnuUnifont = "/usr/share/fonts/opentype/unifont/unifont.otf"
 getttf WenQuanYiZenHei
   = "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"
 

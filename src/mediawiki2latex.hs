@@ -16,6 +16,7 @@ import System.Info
 import Compiler (runCompile, runTreeToLaTeX, runNewTree)
 import Tools (replace2)
 import Load
+import GetImages
 {-DHUN| Data structure to repesent a single option on the command line. DHUN-}
 
 data Flag = Verbose
@@ -39,6 +40,8 @@ data Flag = Verbose
           | EPub
           | Odt
           | NoParent
+          | LaTeXTables
+          | ChromiumTables
           | Server String
           deriving (Show, Eq)
 
@@ -143,6 +146,17 @@ epubOption = "epub"
 odtOption :: String
 odtOption = "odt"
 
+
+{-DHUN| String constant on for the tableslatex command line option. DHUN-}
+
+tableslatex :: String
+tableslatex = "tableslatex"
+
+{-DHUN| String constant on for the tableslatex command line option. DHUN-}
+
+tableschromium :: String
+tableschromium = "tableschromium"
+
 {-DHUN| Datastructure describing all possible command line options DHUN-}
 
 options :: [OptDescr Flag]
@@ -168,6 +182,10 @@ options
        "use MediaWiki to expand templates",
      Option ['h'] [html] (NoArg Main.HTML)
        "use MediaWiki generated html as input (default)",
+     Option ['e'] [tableslatex] (NoArg Main.LaTeXTables)
+       "use LaTeX to generate tables",
+     Option ['a'] [tableschromium] (NoArg Main.ChromiumTables)
+       "use Chromium to generate tables",
      Option ['n'] [noparentOption] (NoArg Main.NoParent)
        "only include urls which a children of start url",
      Option ['k'] [bookmode] (NoArg Main.BookMode)
@@ -203,7 +221,7 @@ header = "Usage: mediawiki2latex [OPTION...]"
 
 versionHeader :: String
 versionHeader
-  = "mediawiki2latex version 7.45\n" ++ (usageInfo header options)
+  = "mediawiki2latex version 8.7\n" ++ (usageInfo header options)
 
 {-DHUN| print the version string of mediawiki2latex. Takes the output of the compilerOpts function as input. Prints the version string if no options were given or the version command was given does noting otherwise DHUN-}
 
@@ -330,7 +348,7 @@ checkOpts cwd o
                                                       ImperativeState.copy = Nothing, mainPath = "",
                                                       server = Nothing, selfTest = Just (s, e),
                                                       outputType = PlainPDF, compile = Nothing,
-                                                      imgctrb = Nothing, convert=Nothing, noparent=False}
+                                                      convert=Nothing, noparent=False, imgctrburl=Nothing,ctrb=Nothing,latexTables=False}
                          _ -> Left (NotIntegerPairError featuredOption)
            _ -> case serverVal of
                     Just x -> case reads x of
@@ -344,7 +362,7 @@ checkOpts cwd o
                                                            mainPath = "", server = Just z,
                                                            outputType = PlainPDF,
                                                            selfTest = Nothing, compile = Nothing,
-                                                           imgctrb = Nothing,  convert=Nothing, noparent=False}
+                                                           convert=Nothing, noparent=False, imgctrburl=Nothing,ctrb=Nothing,latexTables=False}
                                   _ -> Left (NotIntegerError serverOption)
                     _ -> do hexVal <- atMostOne hexPredicate hexen o
                             case hexVal of
@@ -374,6 +392,8 @@ checkOpts cwd o
                                                                     Left PaperError
                                                         _ -> Right defaultPaper
                                         let mediaWikiVal = (MediaWiki `elem` o)
+                                        let latexTablesVal = (LaTeXTables `elem` o)
+                                        let chromiumTablesVal = (ChromiumTables `elem` o)
                                         let bookModeVal = if (Main.BookMode `elem` o) then ImperativeState.Yes else ImperativeState.No 
                                         let htmlVal = (Main.HTML `elem` o)
                                         let zipVal = (Main.Zip `elem` o)
@@ -387,6 +407,10 @@ checkOpts cwd o
                                                   (boolToInt htmlVal)
                                                   + (maybeToInt templatesVal)
                                         if mysum > 1 then Left ToManyOptionsError else Right ()
+                                        let mytablesum
+                                              = ((boolToInt latexTablesVal) + (boolToInt chromiumTablesVal))::Integer 
+                                        if mytablesum > 1 then Left ToManyTableOptionsError else Right ()
+                                        
                                         if
                                           ((boolToInt zipVal) + (boolToInt epubVal) +
                                              (boolToInt odtVal))
@@ -417,7 +441,7 @@ checkOpts cwd o
                                                         if zipVal then ZipArchive else
                                                           if epubVal then EPubFile else
                                                             if odtVal then OdtFile else PlainPDF,
-                                                      compile = Nothing, imgctrb = Nothing, convert=Nothing, noparent=noparentVal})
+                                                      compile = Nothing, convert=Nothing, noparent=noparentVal, imgctrburl=Nothing,ctrb=Nothing, latexTables=if latexTablesVal then True else (if chromiumTablesVal then False else True)})
 
 {-DHUN| main entry point of mediawiki2latex DHUN-}
 
@@ -438,18 +462,21 @@ main
                          NewLoad fn -> do _ <- (runStateT (runExceptT (runqBookIncludeAction fn)) stz)
                                           return ()
                        _-> case (compile x) of
-                            Just dir -> do _ <- (runStateT (runExceptT (runCompile dir x)) stz)
+                            Just dir -> do _ <- (runStateT (runExceptT (runCompile dir x)) stz{latexTable=(latexTables x)})
                                            return ()
-                            _ -> case (imgctrb x) of
-                                   Just dir -> do _ <- (runStateT (runExceptT (runCtrb dir)) stz)
+                            _ -> case (ctrb x) of
+                                    Just fn -> do _<-(runStateT (runExceptT (getContribCallBack fn)) stz)
                                                   return ()
-                                   _ -> case (server x) of
+                                    _ -> case (server x) of
                                             Just zz -> serve zz
-                                            _ -> do print x
-                                                    (xx, _) <- (runStateT (runExceptT (All.all x))
-                                                                  stz {vectorr=(vector x)})
-                                                    case xx of
-                                                        Left n -> print n
-                                                        _ -> return ()
+                                            _ ->  case (imgctrburl x) of
+                                                   Just (cufile,host) -> do _<-(runStateT (runExceptT (runCtrbUrl cufile host)) stz)
+                                                                            return ()
+                                                   _-> do print x
+                                                          (xx, _) <- (runStateT (runExceptT (All.all x))
+                                                                      stz {vectorr=(vector x)})
+                                                          case xx of
+                                                            Left n -> print n
+                                                            _ -> return ()
            Left y -> print y
        return ()

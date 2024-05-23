@@ -268,14 +268,14 @@ verticalSeperator False = ""
 {-DHUN| the function returns the a string to be inserted into a latex document for multirows at a when a new column (that is a new cell) starts, thats when a column separator, or header column separator is encountered. The first parameter it the index of the current column. The second parameter is the multirowdict (see documentation of the multiRowDictChangeStart function in this module). The third parameter is a boolean. If it is true rules will be drawn in the table, otherwise they won't DHUN-}
 
 multiRowSymbol :: Int -> Map Int (Int, Int) -> Bool -> String
-multiRowSymbol i d t= s ++ (if any (>=i) (keys d) then (multiRowSymbol (i + (if bb==0 then 1 else bb)) d t) else "")
+multiRowSymbol i d t= s  ++ (if (any (>=i) (keys d))&&(not(((Map.lookup (i+bb) d)>>= (\(g,_) ->Just g)) `elem` [Nothing,Just 0])) then (multiRowSymbol (i + (if bb==0 then 1 else bb)) d t) else "")
 
   where
     (bb,s)  = (withDefault (0,"") (> 0)  (\ _ b ->
          (b,"\\multicolumn{" ++
            (show b) ++
              "}{" ++
-               (verticalSeperator t) ++
+               (if (i==1) then (verticalSeperator t) else "")++
                  "c" ++
                    (verticalSeperator t) ++ "}{}&" )) i d)
 
@@ -284,17 +284,17 @@ multiRowSymbol i d t= s ++ (if any (>=i) (keys d) then (multiRowSymbol (i + (if 
 multiRowSymbolForRowSep ::
                         Int -> Map Int (Int, Int) -> Bool -> String
 
-multiRowSymbolForRowSep i d t = intercalate "&" (multiRowSymbolForRowSepInner i d t)
+multiRowSymbolForRowSep i d t = (if (intercalate "&" (multiRowSymbolForRowSepInner i d t)) =="" then "" else "&")++ (intercalate "&" (multiRowSymbolForRowSepInner i d t))
 
 multiRowSymbolForRowSepInner ::
                         Int -> Map Int (Int, Int) -> Bool -> [String]
 multiRowSymbolForRowSepInner i d t
-  = (if s=="" then [] else [s]) ++ (if any (>=i) (keys d) then (multiRowSymbolForRowSepInner (i + (if bb==0 then 1 else bb)) d t) else [])
+  = (if s=="" then [] else [s]) ++ (if (any (>=i) (keys d))&&(not(((Map.lookup (i+bb) d)>>= (\(g,_) ->Just g)) `elem` [Nothing,Just 0])) then (multiRowSymbolForRowSepInner (i + (if bb==0 then 1 else bb)) d t) else [])
   where 
    (bb,s)=(withDefault (0,"") (> 0)  (\ _ b ->  (b,"\\multicolumn{" ++
            (show b) ++
              "}{" ++
-               (verticalSeperator t) ++
+                (if (i==1) then (verticalSeperator t) else "") ++
                  "c" ++
                    (verticalSeperator t) ++
                      "}{}" )) i d)
@@ -308,17 +308,18 @@ multiRowSymbolForTableEnd = multiRowSymbolForRowSep
 
 multiRowCount :: Int -> Map Int (Int, Int) -> Int
 multiRowCount i d
-  = (withDefault 0 (/= 0) (\ _ b -> b) i d) + (if any (>=i) (keys d) then (multiRowCount (i + 1) d) else 0)
+  = (withDefault 0 (/= 0) (\ _ b -> b) i d) + (if (h/=0)&&any (>=i) (keys d)&&(not(((Map.lookup (i+h) d)>>= (\(g,_) ->Just g)) `elem` [Nothing,Just 0])) then (multiRowCount (i + h) d) else 0)
+  where h= (withDefault 0 (/= 0) (\ _ b -> b) i d)
 
 {-DHUN| see documentation on multiRowDictChangeStart. This function take the index of the current column as first parameter. This function takes the multiRowDict as first parameter and returns the modified version of it. DHUN-}
 
 multiRowDictChangeEnd ::
                       Int -> Map Int (Int, Int) -> Map Int (Int, Int)
 multiRowDictChangeEnd i d
-  =  if  any (>=i) (keys d) then multiRowDictChangeEnd (i + 1) xx else xx
+  =  if  (any (>=i) (keys d))&&(not(((Map.lookup (i+bb) xx)>>= (\(g,_) ->Just g)) `elem` [Nothing,Just 0]))  then multiRowDictChangeEnd (i + bb) xx else xx
     where
       xx::Map Int (Int, Int)
-      xx= withDefault d (/= 0)  (\ a b ->  (Map.insert i (a - 1, b)) d) i d
+      (bb,xx)= withDefault (0,d) (/= 0)  (\ a b -> (b,( (Map.insert i (a - 1, b))) d)) i d
 
 
 

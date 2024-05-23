@@ -1,5 +1,5 @@
 Name:           mediawiki2latex
-Version:        7.45
+Version:        8.7
 License:        GPL
 License-File:   LICENSE
 Author:         Dirk Hünniger <dirk.hunniger@googlemail.com>
@@ -122,7 +122,6 @@ Executable mediawiki2latex
     temporary >1.0,
     file-embed,
     url >=2.1 ,
-    hxt-http >=9 ,
     hxt >=8 ,
     utf8-string >=0.3.6 ,
     parsec >=2.1 ,
@@ -158,7 +157,6 @@ Executable mediawiki2latex
     FontTool
     GetImages
     Hex
-    HtmlRenderer
     ImperativeState
     LatexRenderer
     Licenses
@@ -179,7 +177,6 @@ Executable mediawiki2latex
     WikiHelper
     WikiLinkHelper
     HtmlParser
-
   GHC-Options:    -Wall -fno-warn-orphans -O2 -rtsopts "-with-rtsopts=-K1000M -N" -threaded -optl-Wl,-z,relro -optl-Wl,-z,now 
   Hs-Source-Dirs: src
   Main-Is: mediawiki2latex.hs

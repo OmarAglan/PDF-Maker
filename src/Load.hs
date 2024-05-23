@@ -134,11 +134,16 @@ qIncludeAction :: WikiUrl -> String -> ImperativeMonad String
 qIncludeAction wurl text
   = if isInfixOf "Vorlage" text then return ("{{" ++ text ++ "}}")
       else
-      do pp <- (liftIO (print d)) >> liftIO (getpage d (wurl))
-         case pp of
-             Just p -> do _ <- addContributors d Nothing
-                          noinclude wurl ("\n\ndhunparserurl " ++ d ++ "\n\n" ++ p)
-             _ -> return ""
+      do st<-get
+         if d `Data.List.elem` (finishedLemmas st) 
+           then return [] 
+           else
+             do put (st{finishedLemmas=(d:(finishedLemmas st))})
+                pp <- (liftIO (print d)) >> liftIO (getpage d (wurl))
+                case pp of
+                  Just p -> do _ <- addContributors d Nothing
+                               noinclude wurl ("\n\ndhunparserurl " ++ d ++ "\n\n" ++ p)
+                  _ -> return ""
   where d = (trim (takeWhile (/= '|') text))
 
 
@@ -169,7 +174,7 @@ qBookIncludeActionbase cfg wurl text
                                       _ <- liftIO $
                                              system
                                                ("mediawiki2latex -x " ++
-                                                  (Hex.hex (show (fullconfigbase{compile = Just tempdir, runMode= runMode cfg}))))
+                                                  (Hex.hex (show (fullconfigbase{compile = Just tempdir, runMode= runMode cfg,latexTables=latexTables cfg }))))
                                       case (loadacu st) of
                                           Right base -> do t <- liftIO $ B.readFile (tempdir </> "output")
                                                            put st{loadacu = Right ((case S.decode t of {Right k->k;_->[]})++ base :: [Anything Char])}
@@ -420,10 +425,10 @@ runActions wurl lema text
        f <- runAction "{{:" "}}" (qIncludeAction wurl) e
        g <- runAction "{{:" "}}" (qIncludeAction wurl) f
        h <- runAction "{{:" "}}" (qIncludeAction wurl) g
-       i <- runAction "{{:" "}}" (qIncludeAction wurl) g
-       j <- runAction "{{:" "}}" (qIncludeAction wurl) h
-       _ <- runAction "{{:" "}}" (qIncludeAction wurl) i
-       runAction "{{:" "}}" (qIncludeAction wurl) j
+       i <- runAction "{{:" "}}" (qIncludeAction wurl) h
+       j <- runAction "{{:" "}}" (qIncludeAction wurl) i
+       k <- runAction "{{:" "}}" (qIncludeAction wurl) j
+       runAction "{{:" "}}" (qIncludeAction wurl) k
 
 runBookActions :: FullWikiUrl -> String -> FullConfig ->ImperativeMonad String
 runBookActions fu text cfg

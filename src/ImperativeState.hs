@@ -8,7 +8,6 @@ import MediaWikiParseTree
 import UrlAnalyse
 import Control.Concurrent.MVar
 import Data.List
-import Network.URL
 {-DHUN| A type to for errors that might be thrown during the imperative calculation DHUN-}
 import Data.Serialize
 import GHC.Generics
@@ -23,7 +22,7 @@ data MyError = DownloadError String String
              | ToManyOptionsError
              | ToManyOutputOptionsError
              | PaperError
-
+             | ToManyTableOptionsError
 
 
 
@@ -47,6 +46,8 @@ instance Show MyError where
               msg ++ "could not be parsed to a pair of integers (like -f 23:42)"
         show PaperError
           = "Error: The option paper may only be one of A4,A5,B5,letter,legal,executive"
+        show ToManyTableOptionsError
+          = "Error: at most one of the options --tableschromium or ---tableslatex  may be given"
         show ToManyOptionsError
           = "Error: at most one of the options --internal --templates --mediawiki --html may be given"
         show ToManyOutputOptionsError
@@ -88,19 +89,15 @@ imperativeStateZero
   = do v <- newMVar (0 :: Int)
        return
          ImperativeState{audict = [], fullUrl = fullWikiUrlZero,
-                         tmpPath = "", counter = v, loadacu = Right [], vectorr=False, noparentis=False}
+                         tmpPath = "", counter = v, loadacu = Right [], vectorr=False, noparentis=False,latexTable = False,finishedLemmas=[]}
 
 data ImperativeState = ImperativeState{audict ::
                                        [(Map String Contributor)],
                                        fullUrl :: FullWikiUrl, tmpPath :: String,
-                                       counter :: MVar Int, loadacu :: Either [FilePath] [Anything Char], vectorr::Bool, noparentis::Bool}
+                                       counter :: MVar Int, loadacu :: Either [FilePath] [Anything Char], vectorr::Bool, noparentis::Bool,latexTable :: Bool, finishedLemmas::[String]}
 
 
 
-data ImageInfo = ImageInfo{wikiFilename :: String,
-                           imageNumber :: Integer, contributorUrls :: [String],
-                           descriptionUrl :: URL}
-               deriving (Show, Read, Serialize, Generic)
 
 type ImperativeMonad = ExceptT MyError (StateT ImperativeState IO)
 
@@ -132,7 +129,7 @@ data FullConfig = FullConfig{headers :: Maybe String,
                              vector :: Bool, copy :: Maybe String, mainPath :: String,
                              server :: Maybe Int, outputType :: OutputType,
                              selfTest :: Maybe (Integer, Integer), compile :: Maybe String,
-                             imgctrb :: Maybe String, convert:: Maybe (ConvertState), noparent::Bool}
+                             convert:: Maybe (ConvertState), noparent::Bool, imgctrburl :: Maybe (String,String),ctrb :: Maybe String, latexTables :: Bool}
                 deriving (Show, Read, Serialize, Generic)
 
 fullconfigbase :: FullConfig
@@ -141,4 +138,4 @@ fullconfigbase
                outputFilename = "", inputUrl = "", runMode = HTML No, paper = "A4",
                vector = False, copy = Nothing, mainPath = "", server = Nothing,
                outputType = PlainPDF, selfTest = Nothing, compile = Nothing,
-               imgctrb = Nothing, convert =Nothing, noparent=False}
+               convert =Nothing, noparent=False, imgctrburl=Nothing,ctrb=Nothing, latexTables = False}

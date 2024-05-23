@@ -7,32 +7,455 @@ module LatexRenderer
         initialUrlState, makeLables, templateRegistry, baseUrl,
         deepFlatten, wikiLinkCaption, imageSize, isCaption, linewidth,
         generateGalleryImageNumbers, splitToTuples, galleryTableScale,
-        tempProcAdapter)
+        tempProcAdapter, treeToHtml3)
        where
 import Data.String.HT (trim)
-import MyState
 import Data.List
+import Control.Monad.Trans.State(state, State, runState, StateT, runStateT, put, get)
 import qualified Data.Map as Map
-import Data.Map.Strict (Map)
 import Data.Char
 import Text.Printf
 import FontTool
 import MediaWikiParseTree
 import MagicStrings
-import Tools
-import Control.Monad.Trans.State
-       (State, state, runState, StateT, runStateT, put, get)
+import Tools hiding (unhex)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad (guard, mplus, msum)
 import TableHelper
 import GHC.Float
-import WikiLinkHelper
-import WikiHelper
-import Data.List.Split
 import BaseFont
 import Data.Maybe
 import Data.Tuple (swap)
 import MediaWikiParser hiding (prep)
+import MyState
+import Data.Map.Strict (Map)
+import WikiHelper
+import WikiLinkHelper
+import Tools
+import Babel
+import Data.List.Split
+import Data.Hashable
+import Hex
+
+type HtmlRenderer = State MyState
+
+templateToHtml :: [Anything Char] -> String -> Renderer String
+templateToHtml l s
+  = state $
+      \ st -> swap $ templateHtmlProcessor st (prepateTemplate l s)
+
+templateHtmlProcessor ::
+                      MyState ->
+                        (String, Map String [Anything Char]) -> (MyState, String)
+templateHtmlProcessor st
+  ("Mathe f\252r Nicht-Freaks: Vorlage:Warnung", ll)
+  = (st,
+     "<b>Warnung</b><br/>" ++
+       (treeToHtml (Map.findWithDefault [] "1" ll) st) ++ "")
+templateHtmlProcessor st
+  ("Mathe f\252r Nicht-Freaks: Vorlage:Hinweis", ll)
+  = (st,
+     "<b>Hinweis</b><br/>" ++
+       (treeToHtml (Map.findWithDefault [] "1" ll) st) ++ "")
+templateHtmlProcessor st
+  ("Mathe f\252r Nicht-Freaks: Vorlage:Beispiel", ll)
+  = (st,
+     "<b>Beispiel</b><br/>" ++
+       (treeToHtml (Map.findWithDefault [] "beispiel" ll) st) ++ "")
+templateHtmlProcessor st
+  ("Mathe f\252r Nicht-Freaks: Vorlage:Satz", ll)
+  = (st,
+     "<b>Satz</b><br/>" ++
+       (treeToHtml (Map.findWithDefault [] "satz" ll) st) ++ "")
+templateHtmlProcessor st
+  ("Mathe f\252r Nicht-Freaks: Vorlage:L\246sungsweg", ll)
+  = (st,
+     "<b>Wie kommt man auf den Beweis?</b>" ++
+       (treeToHtml (Map.findWithDefault [] "l\246sungsweg" ll) st) ++ "")
+templateHtmlProcessor st
+  ("Mathe f\252r Nicht-Freaks: Vorlage:Beweis", ll)
+  = (st,
+     "<b>Beweis: </b><br/>" ++
+       (treeToHtml (Map.findWithDefault [] "beweis" ll) st) ++ "")
+templateHtmlProcessor st
+  ("Mathe f\252r Nicht-Freaks: Vorlage:Definition", ll)
+  = (st,
+     "<b>Definition: </b><i>(" ++
+       (treeToHtml (Map.findWithDefault [] "titel" ll) st) ++
+         ")</i><br/>" ++
+           (treeToHtml (Map.findWithDefault [] "definition" ll) st))
+templateHtmlProcessor st
+  ("mathe f\252r Nicht-Freaks: Vorlage:Definition", ll)
+  = (st,
+     "<b>Definition: </b><i>(" ++
+       (treeToHtml (Map.findWithDefault [] "titel" ll) st) ++
+         ")</i><br/>" ++
+           (treeToHtml (Map.findWithDefault [] "definition" ll) st))
+templateHtmlProcessor st ("-", ll)
+  = (tempProcAdapter $ mnfindent ll) st
+templateHtmlProcessor st
+  ("Mathe f\252r Nicht-Freaks: Vorlage:Klapptext", ll)
+  = (tempProcAdapter $ mnfklapptext ll) st
+templateHtmlProcessor st
+  ("Aufgabensammlung: Vorlage:Klapptext", ll)
+  = (tempProcAdapter $ mnfklapptext ll) st
+templateHtmlProcessor st
+  ("Aufgabensammlung: Vorlage:Vollst\228ndige Induktion", ll)
+  = (tempProcAdapter $ mnfinduktion ll) st
+templateHtmlProcessor st ("Formel", ll)
+  = (st,
+     "<dl><dd>" ++
+       (treeToHtml (Map.findWithDefault [] "1" ll) st) ++ "</dd></dl>")
+templateHtmlProcessor st
+  ("Mathe f\252r Nicht-Freaks: Vorlage:Frage", ll)
+  = (tempProcAdapter $ mnffrage ll) st
+templateHtmlProcessor st ("Anker", _) = (st, "")
+templateHtmlProcessor st ("Symbol", ll)
+  = (st, (treeToHtml (Map.findWithDefault [] "1" ll) st))
+templateHtmlProcessor st
+  ("#invoke:Mathe f\252r Nicht-Freaks/Seite", _) = (st, "")
+templateHtmlProcessor st ("Aufgabensammlung: Vorlage:Infobox", _)
+  = (st, "")
+templateHtmlProcessor st ("Aufgabensammlung: Vorlage:Symbol", _)
+  = (st, "")
+templateHtmlProcessor st ("Nicht l\246schen", _) = (st, "")
+templateHtmlProcessor st ("#ifeq:{{{include", _) = (st, "")
+templateHtmlProcessor st ("Druckversion Titelseite", _) = (st, "")
+templateHtmlProcessor st ("PDF-Version Gliederung", _) = (st, "")
+templateHtmlProcessor st ("#invoke:Liste", _) = (st, "")
+templateHtmlProcessor st ("Smiley", _) = (st, "\9786")
+templateHtmlProcessor st ("", _) = (st, "")
+templateHtmlProcessor st (x, _)
+  = (st, "UNKNOWN TEMPLATE " ++ x ++ " ")
+
+wikiLinkCaptionHtml :: [Anything Char] -> MyState -> String
+wikiLinkCaptionHtml l st = if isCaption x then rebuild x else ""
+  where x = (treeToHtml (last (splitOn [C '|'] l)) st)
+        rebuild (':' : xs) = xs
+        rebuild b = b
+
+wikiImageToHtml :: [Anything Char] -> Renderer String
+wikiImageToHtml l
+  = do st <- get
+       mystr <- return 
+                  ((if not (micro st) then "<p>" else "") ++
+                     "<" ++
+                       (if ext == "webm" then "video controls" else "img") ++
+                         " src=\"./images/" ++
+                           (n st) ++
+                             "." ++
+                               (if (ext=="svg" && (not (MyState.vector st))) then "png" else ext) ++
+                                 "\" style=\"width: " ++
+                                   (if (tb st) then "100.0" else (mysize st)) ++
+                                     "%;\">" ++
+                                       (if (not (micro st)) then
+                                          "<br/> " ++
+                                            (getfig st) ++ " " ++ (n st) ++ " " ++ (s st) ++ "</p>"
+                                          else ""))
+       put
+         st{getImages = (getImages st) ++ [shallowFlatten l],
+            getJ = ((getJ st) + 1)}
+       return mystr
+  where ext
+          = normalizeExtensionHtml
+              (map toLower
+                 (fileNameToExtension (headSplitEq '|' (shallowFlatten l))))
+        s st
+          = if (trim (s1 st)) `elem` ["verweis=", "alt=", "link="] then ""
+              else (s1 st)
+        s2 st
+          = case Map.lookup "alt" (snd (prepateTemplate l "x")) of
+                Just xx -> wikiLinkCaptionHtml xx st
+                Nothing -> wikiLinkCaptionHtml l st
+        s1 st
+          = if '|' `elem` (shallowFlatten l) then (s2 st) else
+              (treeToHtml [] st{getJ = ((getJ st) + 1)})
+        mysize st = printf "%0.5f" ((mysizefloat2 st) * 100.0)
+        mysizefloat st = (min (getF st) (imageSize l))
+        mysizefloat2 st = if (msb st) then 1.0 else (mysizefloat st)
+        msb st = (mysizefloat st) == (getF st)
+        micro st = ((mysizefloat st) < 0.17) || ((getInTab st) > 1)
+        n st = show (getJ st)
+        tb st = ((getInTab st) > 0)
+        getfig st
+          = head
+              (splitOn "}"
+                 (last
+                    (splitOn "\\newcommand{\\myfigurebabel}{"
+                       (makeBabel (langu st) "en"))))
+
+galleryContentToHtml :: [[Anything Char]] -> Renderer String
+galleryContentToHtml (x : xs)
+  = do s <- galleryRowToHtml x
+       ss <- galleryContentToHtml xs
+       return $ s ++ "</tr><tr>" ++ ss
+galleryContentToHtml [] = return []
+
+{-DHUN| converts a part of a gallery (image gallery, gallery tag) from parse tree to latex. A part are as many elements as fit into a single row in the resulting latex table DHUN-}
+
+galleryRowToHtml :: [Anything Char] -> Renderer String
+galleryRowToHtml [] = return []
+galleryRowToHtml (x : []) = treeToHtml2 [x]
+galleryRowToHtml (x : xs)
+  = do s <- treeToHtml2 [x]
+       g <- galleryRowToHtml xs
+       return $ s ++ "</td><td>" ++ g
+
+{-DHUN| Converts are gallery (image gallery, gallery tag) from parse tree to latex. Also writes table header and footer. This is the function you should use for converting galleries to latex DHUN-}
+
+galleryToHtml :: [Anything Char] -> Renderer String
+galleryToHtml x
+  = do st <- get
+       put st{getF = (getF st) * galleryTableScale}
+       s <- (galleryContentToHtml
+               [z | z <- splitToTuples [y | y <- x, isWikiLink y],
+                trim (treeToHtml z st) /= ""])
+       st2 <- get
+       put st2{getF = (getF st)}
+       return ("<table><tr>" ++ s ++ "</tr></table>")
+
+mnffrage :: Map String [Anything Char] -> Renderer String
+mnffrage ll
+  = do typ <- treeToHtml2 (Map.findWithDefault [] "typ" ll)
+       frage <- treeToHtml2 (Map.findWithDefault [] "frage" ll)
+       antwort <- treeToHtml2 (Map.findWithDefault [] "antwort" ll)
+       return
+         ("<dl><dd><b>" ++
+            typ ++ ":</b> " ++ frage ++ "</dd><dd>" ++ antwort ++ "</dd></dl>")
+
+mnfindent :: Map String [Anything Char] -> Renderer String
+mnfindent ll
+  = do one <- treeToHtml2 (Map.findWithDefault [] "1" ll)
+       return ("<dl><dd>" ++ one ++ "</dd></dl>")
+
+mnfklapptext :: Map String [Anything Char] -> Renderer String
+mnfklapptext ll
+  = do kopf <- treeToHtml2 (Map.findWithDefault [] "kopf" ll)
+       inhalt <- treeToHtml2 (Map.findWithDefault [] "inhalt" ll)
+       return ("<b>" ++ kopf ++ "</b><br/>" ++ inhalt)
+
+mnfinduktion :: Map String [Anything Char] -> Renderer String
+mnfinduktion ll
+  = do erf <- treeToHtml2
+                (Map.findWithDefault [] "erfuellungsmenge" ll)
+       aus <- treeToHtml2 (Map.findWithDefault [] "aussageform" ll)
+       anf <- treeToHtml2 (Map.findWithDefault [] "induktionsanfang" ll)
+       vor <- treeToHtml2
+                (Map.findWithDefault [] "induktionsvoraussetzung" ll)
+       beh <- treeToHtml2
+                (Map.findWithDefault [] "induktionsbehauptung" ll)
+       sch <- treeToHtml2
+                (Map.findWithDefault [] "beweis_induktionsschritt" ll)
+       return
+         ("<b>Aussageform, deren Allgemeing\252ltigkeit f\252r " ++
+            erf ++
+              " bewiesen werden soll:</b><br/>" ++
+                aus ++
+                  "<br/><b>1. Induktionsanfang</b><br/>" ++
+                    anf ++
+                      "<br/><b>2. Induktionsschritt</b><br><b>2a. Induktionsvoraussetzung</b><br/>"
+                        ++
+                        vor ++
+                          "<br/><b>2b. Induktionsbehauptung</b><br/>" ++
+                            beh ++
+                              "<br/><b>2c. Beweis des Induktionsschritts</b><br/>" ++
+                                sch ++ "<br/>")
+
+writedict :: [(String, String)] -> String
+writedict [] = []
+writedict ((k, v) : xs)
+  = k ++ "=\"" ++ v ++ "\" " ++ (writedict xs)
+
+treeToHtml3 ::
+            Map String Int ->
+              Maybe String ->
+                String -> [Anything Char] -> MyState -> (String, MyState)
+treeToHtml3 formulas mylanguage title l st
+  = let (a, b)
+          = runState (treeToHtml2 l) st{langu = mylanguage, forms = formulas}
+      in
+      ("<html><head><meta charset=\"utf-8\"><title>" ++
+         title ++
+           "</title><style>table.sourceCode, tr.sourceCode, td.lineNumbers, td.sourceCode {  margin: 0; padding: 0; vertical-align: baseline; border: none; }\ntable.sourceCode { width: 100%; line-height: 100%; }\ntd.lineNumbers { text-align: right; padding-right: 4px; padding-left: 4px; }\ntd.sourceCode { padding-left: 5px; }\ncode > span.kw { font-weight: bold; }\ncode > span.dt { text-decoration: underline; }\ncode > span.co { font-style: italic; }\ncode > span.al { font-weight: bold; }\ncode > span.er { font-weight: bold; }\n@page {\n    size: 7in 100in;\n    margin: 0mm 0mm 0mm 0mm;\n}</style></head><body>"
+             ++ a,       b)
+
+treeToHtml :: [Anything Char] -> MyState -> String
+treeToHtml l states = (fst $ runState (treeToHtml2 l) states)
+
+
+treeToHtml4 :: [Anything Char] -> HtmlRenderer String
+treeToHtml4 ll
+  = do x <- allinfo
+       return $ concat x
+  where allinfo :: HtmlRenderer [String]
+        allinfo = mapM nodeToHtml ll
+
+        walk :: String -> [Anything Char] -> String -> HtmlRenderer String
+        walk prefix l postfix
+          = do d <- treeToHtml4 l
+               return $ prefix ++ d ++ postfix
+        nodeToHtml (C c)
+          = do st <- get
+               x <- if (c == '\n') && ((lastChar st) == c) then return "</p><p>"
+                      else return [c]
+               put st{lastChar = c}
+               return x
+
+        nodeToHtml (Environment _ (TagAttr x m) l)
+          = walk ("<" ++ x ++ " " ++ (writedict  (Map.toList (updateDict m))) ++ ">") l
+              ("</" ++ x ++ ">")
+        nodeToHtml (Environment _ _ l) = walk "" l ""
+        nodeToHtml _ = return []
+        updateDict m = Map.adjust udf2 "srcset" (Map.adjust udf "src" m) 
+        udf ('/':'/':xs)="https://"++xs
+        udf xs = xs
+        udf2 (',':' ':'/':'/':xs)= ", https://"++(udf2 xs)
+        udf2 (x:xs) = x:(udf2 xs)
+        udf2 [] = []
+
+
+treeToHtml2 :: [Anything Char] -> HtmlRenderer String
+treeToHtml2 ll
+  = do x <- allinfo
+       return $ concat x
+  where allinfo :: HtmlRenderer [String]
+        allinfo = mapM nodeToHtml ll
+        
+        walk :: String -> [Anything Char] -> String -> HtmlRenderer String
+        walk prefix l postfix
+          = do d <- treeToHtml2 l
+               return $ prefix ++ d ++ postfix
+        walk4 :: String -> [Anything Char] -> String -> HtmlRenderer String
+        walk4 prefix l postfix
+          = do d <- treeToHtml4 l
+               return $ prefix ++ d ++ postfix
+        
+        nodeToHtml :: Anything Char -> HtmlRenderer String
+        nodeToHtml (C c)
+          = do st <- get
+               x <- if (c == '\n') && ((lastChar st) == c) then return "</p><p>"
+                      else return [c]
+               put st{lastChar = c}
+               return x
+
+        nodeToHtml (Environment Tag (TagAttr "table" m) l)
+          = do sst<-get
+               if (latexTabs sst) 
+                 then do st <- get
+                         put $ st{getInTab = (getInTab st) + 1}
+                         d <- walk ("<table " ++ (writedict (Map.toList m)) ++ ">") l ("</table>")
+                         st2 <- get
+                         put $ st2{getInTab = (getInTab st)}
+                         return d
+                 else walk4 ("<" ++ "table" ++ " " ++ (writedict (Map.toList m)) ++ ">") l ("</" ++ "table" ++ ">")
+        nodeToHtml (Environment Wikitable (TagAttr "table" m) l)
+          = do st<- get 
+               if (latexTabs st)
+                 then walk ("<table "++ (writedict (Map.toList m))++" ><tr>") l "</tr></table>" 
+                 else walk4 ("<" ++ "table" ++ " " ++ (writedict (Map.toList m)) ++ ">") l ("</" ++ "table" ++ ">")
+        nodeToHtml (Environment HtmlChar (Str s) _)
+          = return ("&"++s++";")
+        nodeToHtml (Environment Wikilink _ l)
+          = do st <- get
+               if getInHeading st then return $ wikiLinkCaptionHtml l st else
+                 if (isImage (shallowFlatten l)) then wikiImageToHtml l else
+                   return $ wikiLinkCaptionHtml l st
+        nodeToHtml (Environment Tag (TagAttr "br" _) _) = return "<br/>"
+        nodeToHtml (Environment Tag (TagAttr "script" _) _) = return []
+        nodeToHtml (Environment Source (TagAttr _ _) l)
+          = do let g = case reverse l of
+                           [] -> []
+                           (x : xs) -> if x == (C '\n') then reverse xs else l
+               d <- treeToHtml2 (breakLines3 linewidth g)
+               return $ (rtrim d)
+        nodeToHtml (Environment Template (Str s) l) = templateToHtml l s
+        nodeToHtml (Environment Wikitable (TagAttr _ m) l)
+          = walk ("<table "++ (writedict (Map.toList m))++" ><tr>") l "</tr></table>"
+        nodeToHtml (Environment Wikitable _ l)
+          = walk "<table><tr>" l "</tr></table>"
+        nodeToHtml (Environment TableRowSep _ _) = return "</tr><tr>"
+        nodeToHtml (Environment TableColSep (TagAttr _ m) _) = return ("</td><td "++(writedict (Map.toList m)) ++" >")
+
+        nodeToHtml (Environment TableColSep _ _) = return ("</td><td>")
+        nodeToHtml (Environment TableHeadColSep _ _) = return "</th><th>"
+        nodeToHtml (Environment TableCap _ l)
+          = walk "<caption>" l "</caption>"
+        nodeToHtml (Environment Wikiheading (Str x) l)
+          = let y = (show (length x)) in
+              walk ("<h" ++ y ++ ">") l ("</h" ++ y ++ ">")
+        nodeToHtml (Environment ItemEnv (Str _) [Item _]) = return []
+        nodeToHtml (Environment ItemEnv (Str s) l)
+          = do tag <- return
+                        (case s of
+                             "*" -> "ul"
+                             _ -> "ol")
+               walk ("<" ++ tag ++ ">") l ("</li></" ++ tag ++ ">")
+        nodeToHtml (Item _) = return "</li><li>"
+        nodeToHtml (Environment Tag (TagAttr "noscript" _) _) = return []
+        nodeToHtml (Environment Tag (TagAttr "head" _) _) = return []
+        nodeToHtml (Environment Tag (TagAttr "a" m) l) = do st<-get
+                                                            walk ("<a " ++ (writedict (Map.toList (Map.update (\r-> if (take 5 r) == "/wiki" then Just (wikiUrlDataToString (urld st) r) else Just r) "href" m))) ++ ">") l  ("</a>")
+        nodeToHtml (Environment Tag (TagAttr "body" _) l) = walk "" l ""
+        nodeToHtml (Environment Tag (TagAttr "html" _) l) = walk "" l ""
+        nodeToHtml (Environment NumHtml (Str s) l) = walk ("&#"++s++";") l ""
+        nodeToHtml (Environment Tag (TagAttr "div" a) l)
+          = if (Map.member "class" a) then
+              if
+                ((Map.findWithDefault [] "class" a) `elem`
+                   ["noprint", "latitude", "longitude", "elevation"])
+                  || ((Map.findWithDefault [] "id" a) `elem` ["coordinates"])
+                then return "" else walk ("<div " ++ (writedict (Map.toList a)) ++ ">") l
+                 ("</div>")
+              else walk ("<div " ++ (writedict (Map.toList a)) ++ ">") l
+                 ("</div>")
+        nodeToHtml (Environment Tag (TagAttr "img" m) _)
+          | (Map.lookup "class" m) == (Just "mwe-math-fallback-image-inline")
+            = return []
+        nodeToHtml (Environment Comment _ _) = return []
+        nodeToHtml (Environment Preformat (TagAttr "pre" _) l)
+          = walk "<pre>" l "</pre>"
+        nodeToHtml (Environment Math (TagAttr "math" _) l)
+          = do st <- get
+               return
+                 ("<img src=\"./formulas/" ++
+                    (hex (show (hash (mathTransform l)))) ++
+                      ".png\" style=\" width:" ++
+                        (show
+                           ((((forms st) Map.!
+                                ((hex (show (hash (mathTransform l)))) ++ ".png"))
+                               * 2)
+                              `div` 3))
+                          ++ "px;\" />")
+        nodeToHtml (Environment Math _ l)
+          = do st <- get
+               return
+                 ("<img src=\"./formulas/" ++
+                    (hex (show (hash (mathTransform l)))) ++
+                      ".png\" style=\" width:" ++
+                        (show
+                           ((((forms st) Map.!
+                                ((hex (show (hash (mathTransform l)))) ++ ".png"))
+                               * 2)
+                              `div` 3))
+                          ++ "px;\" />")
+        nodeToHtml (Environment Gallery _ l)
+          = do st <- get
+               put st{getInGallery = True}
+               d <- galleryToHtml l
+               st2 <- get
+               put $ (newst st2){getInGallery = (getInGallery st)}
+               return d
+          where midst i = i{getInGallery = False}
+                gins i = generateGalleryImageNumbers i (midst i)
+                newst i
+                  = (midst i){getGalleryNumbers =
+                                (getGalleryNumbers (midst i)) ++ (map toInteger (gins i))}
+        nodeToHtml (Environment Tag (TagAttr "span" _) l) = walk "" l ""
+        nodeToHtml (Environment Tag (TagAttr x m) l)
+          = walk ("<" ++ x ++ " " ++ (writedict (Map.toList m)) ++ ">") l
+              ("</" ++ x ++ ">")
+        nodeToHtml (Environment _ _ l) = walk "" l ""
+        nodeToHtml _ = return []
 
 {-DHUN|  the maximum width of lines for preformat and source code DHUN-}
 
@@ -115,6 +538,7 @@ tableContentToLaTeX ((Environment TableRowSep _ l) : xs)
              lastCellWasHeaderCell = False, currentRowIsHeaderRow = False,
              stillInTableHeader =
                if stillInTableHeader st then not mycond else False}
+       st4 <- get
        xx <- tableContentToLaTeX xs
        return $
          if (not (isFirstRow st)) then
@@ -130,8 +554,8 @@ tableContentToLaTeX ((Environment TableRowSep _ l) : xs)
                           ((rowCounter st) == (inputLastRowOfHeader st) - 2))
                           ++
                          (innerHorizontalLine (seperatingLinesRequestedForTable st)
-                            (multiRowMap st3)
-                            (numberOfColumnsInTable st))
+                            (multiRowMap st4)
+                            (numberOfColumnsInTable st))  -- ++ ((show (multiRowMap st3))++"["++(show (currentColumn st3)++"]")++"!"++(show cc)++","++ (show c)++"!")
                            ++ " \n" ++ (varwidthbegin st) ++ xx
            else xx
 tableContentToLaTeX ((Environment TableColSep _ l) : xs)
@@ -159,9 +583,11 @@ tableContentToLaTeX ((Environment TableColSep _ l) : xs)
                (multiRowEndSymbol (lastCellWasMultiRow st)) ++
                  (columnSeperator (lastCellWasNotFirstCellOfRow st)) ++
                    (multiRowSymbol (currentColumn st) (multiRowMap st)
-                      (seperatingLinesRequestedForTable st))
-                     ++
-                     (multiColumnStartSymbol l (columnsWidthList st) c
+                      (seperatingLinesRequestedForTable st)) ++
+                                     --       (show (multiRowMap st))++"["++(show (currentColumn st)++"]")++"!"++(show cc)++","++ (show c)++"!"++
+
+                      
+                       (multiColumnStartSymbol l (columnsWidthList st) c
                         (seperatingLinesRequestedForTable st)
                         st)
                        ++
@@ -411,6 +837,27 @@ linew2 ls = if ls then linew * 1.414 else linew
 linew :: Double
 linew = 455.45742
 
+
+mapToLaTeX :: [Anything Char] -> Renderer String 
+mapToLaTeX  l2=
+  do st<- get
+     do let  (output,_) =treeToHtml3 (Map.fromList []) (langu st) "" l2 st
+        put st{htmlMaps=(htmlMaps st)++[output]}
+        let n=(1+(length (htmlMaps st)))
+        return ("\n\n\\begin{minipage}{\\textwidth}\n\\begin{center}\n\\includegraphics[width=1.0\\textwidth,height=8.0in,keepaspectratio]{../map"++(show n) ++".pdf}\n\nCopyright OpenStreetMap\\end{center}\n\\raggedright{}\n\\end{minipage}\n\\vspace{0.75cm}\n\n")
+
+tableToLaTeXNew :: [Anything Char] -> Bool -> String -> Maybe Float -> [Anything Char] -> Renderer String 
+tableToLaTeXNew  l1 b s m l2=
+  do st<- get
+     if (latexTabs st) then tableToLaTeX l1 b s m else   (
+       do let  (output,_) =treeToHtml3 (Map.fromList []) (langu st) "" l2 st
+          _<-tableToLaTeX (printPrepareTree False l1) b s m
+          st2<-get
+          put st2{htmlTables=(htmlTables st)++[output]}
+          let n=(1+(length (htmlTables st)))
+          return ("\n\n\\begin{minipage}{\\textwidth}\n\\begin{center}\n\\includegraphics[width=1.0\\textwidth,height=8.0in,keepaspectratio]{../table"++(show n) ++".pdf}\n\\end{center}\n\\raggedright{}\n\\end{minipage}\n\\vspace{0.75cm}\n\n"))
+
+
 {-DHUN| convert a table form the parse tree to latex. The [Anything Char] parameter it the contend of the table represented as a parse tree. The String parameter contains the HTML attributes of the table element, or in wiki notation the HTML parameters of the line beginning with  {| . This is evaluated in order to find out whether rules should be printed in the table. The return type is Renderer String. Which means that it returns a string but also take a state as additional monadic input parameter and returns a possible changed version of it as additional return parameter monadically DHUN-}
 
 tableToLaTeX :: [Anything Char] -> Bool -> String -> Maybe Float -> Renderer String
@@ -469,8 +916,8 @@ tableToLaTeX l1 b s m
                           outputLastRowOfHeader = 0, inputLastRowOfHeader = 0,
                           lastRowHadEmptyMultiRowMap = True,
                           outputTableHasHeaderRows = False, activeColumn = Nothing}
-       put $ newstate{getF = getF st}
-       r <- return $
+       if spec == "" then return () else put $ newstate{getF = getF st}
+       r <- if spec == "" then treeToLaTeX2 l else  return $
               lsb ++
                 sb ++
                   (if (env /= "tabular") then "\n" else "\\scalebox{0.85}{") ++
@@ -931,11 +1378,11 @@ colinfo colcode
                 Nothing -> colcode
         
         ss :: String -> [Integer]
-        ss (a : (b : xs)) = (maybeToList . unhex $ [a, b]) ++ (ss xs)
+        ss (a : (b : xs)) = (maybeToList . Tools.unhex $ [a, b]) ++ (ss xs)
         ss _ = []
         
         ss3 :: String -> [Integer]
-        ss3 (a : xs) = (maybeToList . unhex $ [a, a]) ++ (ss3 xs)
+        ss3 (a : xs) = (maybeToList . Tools.unhex $ [a, a]) ++ (ss3 xs)
         ss3 _ = []
         
         ss2 :: [Integer] -> [Float]
@@ -2451,21 +2898,31 @@ treeToLaTeX2 ll
                    _ -> return (chartrans c)
         nodeToLaTeX (Environment ForbiddenTag (Str s) _)
           = return $ s >>= chartrans
+          
+          
+          
+        nodeToLaTeX (Environment Tag (TagAttr "div" m) lll) | kartopred m =  mapToLaTeX [(Environment Tag (TagAttr "div" m) lll)]
+
+          
+          
+          
+          
+          
         nodeToLaTeX (Environment Wikitable (Str s) l)
           = do st <- get
                put $ st{getInTab = (getInTab st) + 1}
-               d <- tableToLaTeX l False s Nothing
+               d <- tableToLaTeXNew l False s Nothing [(Environment Wikitable (Str s) l)]
                st2 <- get
                put $ st2{getInTab = (getInTab st)}
                return d
-        nodeToLaTeX (Environment Wikitable (TagAttr _ a) l)
+        nodeToLaTeX (Environment Wikitable (TagAttr t a) l)
           = do st <- get
                put $ st{getInTab = (getInTab st) + 1}
-               d <- tableToLaTeX (subTableCellCorrect l) (maybe False (\x->or (map ($ x) (map isInfixOf ["navbox", "infobox"]))) (Map.lookup "class" a))
+               d <- tableToLaTeXNew (subTableCellCorrect l) (maybe False (\x->or (map ($ x) (map isInfixOf ["navbox", "infobox"]))) (Map.lookup "class" a)) 
                       (if
                          (Map.lookup "class" a) `elem`
                            (map Just ["prettytable", "wikitable"])
-                         then "class=\"wikitable\"" else "") ((Map.lookup "style" a)>>= findwd)  
+                         then "class=\"wikitable\"" else "") ((Map.lookup "style" a)>>= findwd) [(Environment Wikitable (TagAttr t a) l)] 
                st2 <- get
                put $ st2{getInTab = (getInTab st)}
                return d
@@ -2643,7 +3100,7 @@ treeToLaTeX2 ll
           = do st <- get
                walk ((fontsetter (font st)) ++ "\\textsubscript{") l "}"
         nodeToLaTeX (Environment Tag (TagAttr "cite" _) l)
-          = walk "\\newline\n \\quad {\\scshape " l "}"
+          = walk "{$\\text{ }$}\\newline\n\\quad {\\scshape " l "}"
         nodeToLaTeX (Environment Sup (Str s) _)
           = return $ "{$^{\\textrm{\\scriptsize " ++ s ++ "}}$}"
         nodeToLaTeX (Environment Sub (Str s) _)
@@ -2726,12 +3183,12 @@ treeToLaTeX2 ll
                                                                                                  else
                                                                                                  "\\colorlet{shadecolor}{"
                                                                                                    ++
-                                                                                                   z1
+                                                                                                   (if z1=="" then "grey" else z1)
                                                                                                      ++
                                                                                                      "}"
                                                                              _ -> Just $
                                                                                     "\\colorlet{shadecolor}{"
-                                                                                      ++ z1 ++ "}"
+                                                                                      ++ (if z1=="" then "grey" else z1) ++ "}"
                                                              _ -> Nothing
                                       _ -> Nothing
                 beg
@@ -2810,7 +3267,7 @@ treeToLaTeX2 ll
                  if (all (\ x -> x `elem` "\r\n\t ") z) then return "" else
                    do d <- treeToLaTeX2 (breakLines3 linewidth l)
                       return $ (preput st) ++ "\\TemplateSpaceIndent{" ++ d ++ "}\n"
-          where preput i = if getInCode i then "" else "\\\\\n\n"
+          where preput i = if (getInCode i)||((getInTab i) > 0) then "" else "\\\\\n\n"
         nodeToLaTeX (Environment Math _ l) = return $ mathToLatex l
         nodeToLaTeX (Environment BigMath _ l)
           = return $
@@ -2822,19 +3279,18 @@ treeToLaTeX2 ll
         nodeToLaTeX (Environment HtmlChar (Str s) _)
           = return $ getHtmlChar s
         nodeToLaTeX (Environment NumHtml (Str s) _)
-          = return $
-              case reads s of
+          =  case reads s of
                   [] -> case
                           do z <- case s of
                                       ('x' : xs) -> Just xs
                                       ('X' : xs) -> Just xs
                                       _ -> Nothing
-                             g <- unhex z
+                             g <- Tools.unhex z
                              return g
                           of
-                            Just x -> chartrans . chr . fromIntegral $ x
-                            Nothing -> ("&#" ++ s ++ ";") >>= chartrans
-                  (x : _) -> chartrans . chr . fst $ x
+                            Just x -> nodeToLaTeX (C (chr ( fromIntegral  x)))
+                            Nothing -> return (("&#" ++ s ++ ";") >>= chartrans)
+                  (x : _) -> nodeToLaTeX (C ( chr  (fst  x)))
         nodeToLaTeX (Environment Gallery _ l)
           = do st <- get
                put st{getInGallery = True}

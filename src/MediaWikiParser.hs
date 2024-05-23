@@ -45,6 +45,22 @@ deepGet t k v ll = concat $ map go ll
         go (Environment _ _ l) = (deepGet t k v l)
         go _ = []
 
+deepGetFigCaption ::
+        [Anything a] -> [Anything a]
+deepGetFigCaption ll = concat $ map go ll
+  where go (Environment Tag (TagAttr "figcaption" m) l) =[Environment Tag (TagAttr "figcaption" m) l]
+        go (Environment _ _ l) = (deepGetFigCaption l)
+        go _ = []
+
+deepGetFigRes ::
+        [Anything Char] -> [Anything Char]
+deepGetFigRes ll = concat $ map go ll
+  where go (Environment Tag (TagAttr "img" m) _) = case Map.lookup "resource" m of
+                                                     Just x -> map C ("File"++ (dropWhile (/= ':') x))
+                                                     _ -> []
+        go (Environment _ _ l) = (deepGetFigRes l)
+        go _ = []
+
 {-DHUN| flattens a part of the parse tree, that is takes the characters found in the tree and turns them into a string dropping all other information in the tree DHUN-}
 
 deepFlatten :: [Anything t] -> [Anything t]
@@ -117,7 +133,7 @@ preserving
 {-DHUN| Helper function for parseAnyClosingBracket. Should not be called directly. The only parameter is the current parser stack. Returns the depth on the stack of the stack frame whose closing bracket matched. DHUN-}
 
 parseAnyClosingBracket2 ::
-                          (Show tok, Eq tok, Read tok) =>
+                          (Show tok, Eq tok) =>
                           MyStack tok -> GenParser tok () Integer
 parseAnyClosingBracket2
   = (parseAnyClosingBracket3 0) . (List.map (\ x -> endparser x))
@@ -148,13 +164,13 @@ remake x = zip (iterate (+ 1) 0) x
 {-DHUN| predicate to test whether the current stack-frame-index is in a stack. The first parameter is the stack-frame-index the second parameter is the stack. Returns true if it could be found DHUN-}
 
 isin ::
-       (Show tok, Eq tok, Read tok) => Int -> (MyStack tok) -> Bool
+       (Show tok, Eq tok) => Int -> (MyStack tok) -> Bool
 isin i s = i `elem` (List.map nestingdepth s)
 
 {-DHUN| tries to parse exactly one specific opening bracket. The parameters are identical to the ones of parseAnyOpeningBracket, which the exception of the second parameter. The second parameter is that parser for the bracket currently under consideration. This function 'catch' the BBad 'exception' 'thrown' by parseAnything. In this case it returns pzero, causing the parser to backtrack. DHUN-}
 
 parseSpecificOpeningBracket ::
-                              (Show tok, Eq tok, Read tok) =>
+                              (Show tok, Eq tok) =>
                               Int ->
                                 (Int, MyParser tok) ->
                                   (MyStack tok) ->
@@ -177,7 +193,7 @@ parseSpecificOpeningBracket v (n, x) s l i
 {-DHUN| tried to parse any of the opening brackets given by the parsers passed as the third parameter. The first parameter is the stack number (see documentation of the parseAnything function for more details on that). The second parameter is the current parser stack (see documentation of the parseAnything2 function for more details on that). The forth parameter is the list of parsers to b taken into account by the general parsing process. In contrast the third parameter contains only a list of parsers that are allowed to match in the current step of the parsing process. The fifth parameter is the current parser output stream. That is the information returned by the parser up to the current step. It is kind of an accumulator for parser results. DHUN-}
 
 parseAnyOpeningBracket ::
-                         (Show tok, Eq tok, Read tok) =>
+                         (Show tok, Eq tok) =>
                          Int ->
                            MyStack tok ->
                              [(Int, MyParser tok)] ->
@@ -192,7 +208,7 @@ parseAnyOpeningBracket v s (x : xs) l i
 {-DHUN| insert a list of closing brackets into the parser output stream. Later on matching opening and closing brackets will be found and parse tree will be generated this way. The first parameter is an integer it is the number of brackets which should be close. The second parameter is the parser stack. It says which kind of brackets should be closed. It returns a parser output stream just containing the opening brackets DHUN-}
 
 generateClosingBrackets ::
-                          (Num a, Eq a, Show tok, Eq tok, Read tok) =>
+                          (Num a, Eq a, Show tok, Eq tok) =>
                           a -> MyStack tok -> [Anything tok]
 generateClosingBrackets 0 (s : xs)
   = [Close (length xs) (environment s)]
@@ -204,7 +220,7 @@ generateClosingBrackets _ _ = []
 {-DHUN| insert a list of opening brackets into the parser output stream. Later on matching opening and closing brackets will be found and parse tree will be generated this way. The first parameter is an integer it is the number of brackets which should be opened. The second parameter is the parser stack. It says which kind of brackets should be opened. It returns a parser output stream just containing the opening brackets DHUN-}
 
 generateOpeningBrackets ::
-                          (Num a, Eq a, Show tok, Eq tok, Read tok) =>
+                          (Num a, Eq a, Show tok, Eq tok) =>
                           a -> MyStack tok -> [Anything tok]
 generateOpeningBrackets 0 _ = []
 generateOpeningBrackets mi (s : xs)
@@ -220,7 +236,7 @@ data Either2 b = RRight b
 {-DHUN| tries to match any of the currently possible closing brackets. Brackets closed in a order different from the reverse to the one in which they were opened are usually possible. And exception are the so called preserving elements, they can only be closed in the correct order. In the general case of this kind of crossbracketing it is necessary to add some opening and closing brackets to the output stream and to take the right stack frame of the stack keeping all others on it in the right order. DHUN-}
 
 parseAnyClosingBracket ::
-                         (Show tok, Eq tok, Read tok) =>
+                         (Show tok, Eq tok) =>
                          Int ->
                            MyStack tok ->
                              [(Int, MyParser tok)] ->
@@ -249,7 +265,7 @@ parseAnyClosingBracket v s l i
 {-DHUN| this function tries to match the bad parser of the current environment. If it matches it returns BBAD, otherwise it returns RRight. See also comment of the parserAnything function. DHUN-}
 
 trybadparser ::
-               (Show tok, Eq tok, Read tok) =>
+               (Show tok, Eq tok) =>
                MyStack tok ->
                  [Anything tok] -> GenParser tok () (Either2 (MyStack tok, [a2]))
 trybadparser s i
@@ -264,7 +280,7 @@ trybadparser s i
 {-DHUN| this is the main function of the parser which calls itself recursively. To run the parser you should not call this function directly but rather use parseAnything2. The parameter are the same as the parameters to the parameters to the function parseAnything2. So look at the documentation for their meaning. But there is one additional parameter namely the first one. This is the stack frame number, it is increase for every stack frame and never decreased this way each stack frame has got a unique identifier this way. An other difference is the return type this function returns the always same type as the function parseAnything2, but wrapped in the Either2 monad. The Either2 monad has an additional bit to signal whether the parse was good or bad. The bad bit signals so called bad parser of the current environment has matched signaling that the environment is to be considered invalid, and we have to backtrack. But what we do here is just stop paring and return a successful parse, but return the bad flag as set in the return type. This will propagate through to the parser that was trying to open the environment that caused the current problem. If that recognizes the problem it can flag the environment as failed by returning pzero. So again here we just return BBad. So we kind of throw an exception. And in parseSpecificOpeningBracket we will catch BBad and signal the actual problem by returning pzero and that way kick of backtracking. DHUN-}
 
 parseAnything ::
-                (Show tok, Eq tok, Read tok) =>
+                (Show tok, Eq tok) =>
                 Int ->
                   MyStack tok ->
                     [(Int, MyParser tok)] ->
@@ -300,7 +316,7 @@ parseAnything v s l i
 {-DHUN| This is the main entry point of the parse. So the function you need to call when you want to convert the source into the parse tree. The first parameter is the stack. I usually should contain only and exactly the root stack frame. The second parameter is an enumerated list of parsers. You usually take a list like the list parsers from this module and enumerate it by running remake on it. So thats the list of environments the parser is able to recognize. The third parameter is the parse results that have been created so far. Since we are just starting the parse this has to be the empty list. The function returns a parser. See the documentation of the parse module for more details on the type GenParser. Roughly is means that this parser takes an input list whose items are of type tok and that the parsers does not have state (hence the void type '()') and return a tuple. The first elements of that tuple is a stack. Where a new stack frame is added to the stack for each new environment that is found to open by the parser, like an opening HTML tag. And the second elements of the tuple is a parse tree, that is a list of parse tree elements, where each parse tree element may contain sublists of parse tree element. This way it is a real tree. DHUN-}
 
 parseAnything2 ::
-                 (Show tok, Eq tok, Read tok) =>
+                 (Show tok, Eq tok) =>
                  MyStack tok ->
                    [(Int, MyParser tok)] ->
                      [Anything tok] -> GenParser tok () (MyStack tok, [Anything tok])
@@ -440,7 +456,7 @@ parsers
      tagparser, tagparser2, tagparsert, tagparser2t, tagparsers,
      stagparser, commentp, reservedp, templatewikilinkp, wikiparamp,
      wikitemplatep, templateinsideverbatimp, templateinsidep,
-     gallerywlp, imagemapwlp, hdevlinep, linkp, linkp2, presectionp,
+     gallerywlp, imagemapwlp, hdevlinep, linkp, linkp2, poemp, presectionp,
      presectionpt, numhtmlp, rtagparser]
 
 {-DHUN| the parser record, with some fields initialized with default values DHUN-}
@@ -543,6 +559,15 @@ greekp
                       _ <- char ';'
                       return (Str (s)),
                self = Greek}
+
+{-DHUN| parses the mediawiki poem tag. That is a little bit like verbatim but allowes some inner tags DHUN-}
+
+
+poemp :: MyParser Char
+poemp
+  = (maketagparser ["poem"]){allowed =
+                               SpaceIndent : everywhere ++ wikilinkwhere,
+                             self = SpaceIndent}
 
 {-DHUN| parses the mediawiki math tag. That is a latex formula in the wiki DHUN-}
 
@@ -1129,12 +1154,12 @@ attrinside x = try (string "&amp;" >> return '&') <|> (noneOf x)
 
 attr :: GenParser Char () ([Char], [Char])
 attr
-  = do try (skipMany1 (oneOf " \n")) <|> (lookAhead (char '=')>> return ())
+  = do try (skipMany1 (oneOf " \t\n")) <|> (lookAhead (char '=')>> return ())
        k <- try (many1 (try (alphaNum) <|> oneOf ":-")) <|> (((lookAhead (char '=')) >> return "class"))
        v <- try
-              (do skipMany (oneOf " \n")
+              (do skipMany (oneOf " \t\n")
                   _ <- char '='
-                  skipMany (oneOf " \n")
+                  skipMany (oneOf " \t\n")
                   vv <- try
                           (do _ <- try (char '"')
                               vvv <- many (attrinside "\"><")
@@ -1251,14 +1276,14 @@ maketagparser tags
                       return (),
                allowed = SpaceIndent : everywheretbl, self = Tag}
 
-{-DHUN| Parser for the 'meta' tag of HTML DHUN-}
+{-DHUN| Parser for the 'meta' and 'link' tag of HTML DHUN-}
 
 metatagparser :: MyParser Char
 metatagparser
   = baseParser{start =
                  \ _ ->
                    do _ <- string "<"
-                      t <- (oneOfTheStrings ["meta"])
+                      t <- (oneOfTheStrings ["meta", "link", "img"])
                       atr <- many (try (attr))
                       _ <- try (many (oneOf " \n")) <|> return []
                       _ <- try (char '/') <|> (return '/')
@@ -1883,9 +1908,17 @@ droplinks ll = concat (map go ll)
 
 {-DHUN| takes a parse tree that was created form the HTML returned by MediaWiki when being requested for the print version of a wiki page. And returns a modified version of that parse tree ready for being converted to LaTeX with treeToLaTeX3 |DHUN-}
 
-printPrepareTree :: [Anything Char] -> [Anything Char]
-printPrepareTree ll = concat (map printPrepareNode ll)
+kartopred :: Map.Map [Char] [Char] -> Bool
+kartopred m = case (Map.lookup "class" m) of
+                Just x -> isInfixOf "mw-kartographer-container" x
+                _ -> False
+
+printPrepareTree :: Bool->[Anything Char] -> [Anything Char]
+printPrepareTree vt ll = concat (map printPrepareNode ll)
   where printPrepareNode :: Anything Char -> [Anything Char]
+        printPrepareNode (Environment Tag (TagAttr "table" m) lll) | vt = [(Environment Wikitable (TagAttr "table" m) lll)] 
+        printPrepareNode (Environment Wikitable (TagAttr "table" m) lll) | vt = [(Environment Wikitable (TagAttr "table" m) lll)] 
+        printPrepareNode (Environment Tag (TagAttr "div" m) lll) | kartopred m = [(Environment Tag (TagAttr "div" m) lll)]
         printPrepareNode (Environment Tag (TagAttr "div" mm) l)
           | (Map.lookup "class" mm) == (Just "thumbinner") =
             case
@@ -1902,18 +1935,164 @@ printPrepareTree ll = concat (map printPrepareNode ll)
                                                                             . (filter magnpred)
                                                                           $ tt
                            _ -> mzero
-                 return $ imgfun m (printPrepareTree llll) (Just (printPrepareTree tt))
+                 return $ imgfun m (printPrepareTree vt llll) (Just (printPrepareTree vt tt))
               of
                 Just x -> x
-                _ -> printPrepareTree l
+                _ -> printPrepareTree vt l
+ 
+ 
         printPrepareNode (Environment Wikitable (TagAttr "table" m) _)
           | (Map.lookup "class" m) == (Just "toc") = []
         printPrepareNode (Environment Tag (TagAttr "tbody" _) x)
-          = printPrepareTree x
+          = printPrepareTree vt x
         printPrepareNode (Environment Tag (TagAttr "div" m) _)
           | ((Map.lookup "class" m) == (Just "toc") ||
                (Map.lookup "id" m) == (Just "toc"))
             = []
+            
+            
+        printPrepareNode (Environment Tag (TagAttr "input" _) l)
+            = printPrepareTree vt l
+            
+        printPrepareNode (Environment Tag (TagAttr "main" _) l)
+            = printPrepareTree vt l
+        printPrepareNode (Environment Tag (TagAttr "label" _) _)
+            = []
+        printPrepareNode (Environment Tag (TagAttr "form" _) _)
+            = []
+        printPrepareNode (Environment Tag (TagAttr "ul" m) _)
+          | ((Map.lookup "class" m) == (Just "vector-toc-contents") ||
+               (Map.lookup "id" m) == (Just "mw-panel-toc-list"))
+            = []
+            
+            
+        printPrepareNode (Environment Tag (TagAttr "a" m) _)
+          | (Map.lookup "class" m) == (Just "mw-logo") 
+            = []
+            
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "class" m) == (Just "vector-header-start") 
+            = []
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "id" m) == (Just "p-search") 
+            = []
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "id" m) == (Just "vector-user-links-dropdown") 
+            = []
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "id" m) == (Just "p-vector-user-menu-overflow") 
+            = []
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "id" m) == (Just "vector-user-links-dropdown") 
+            = []
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "class" m) == (Just "vector-settings") 
+            = []
+            
+            
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "id" m) == (Just "p-personal") 
+            = []
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "id" m) == (Just "p-user-menu-anon-editor") 
+            = []
+            
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "id" m) == (Just "vector-main-menu") 
+            = []
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "id" m) == (Just "p-tb-label") 
+            = []
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "id" m) == (Just "p-coll-print_export-label") 
+            = []
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "id" m) == (Just "vector-page-titlebar-toc") 
+            = []
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "id" m) == (Just "p-variants") 
+            = []
+
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "id" m) == (Just "p-views") 
+            = []
+            
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "id" m) == (Just "p-coll-print_export-labe") 
+            = []
+     
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "class" m) == (Just "vector-menu-content") 
+            = []
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "class" m) == (Just "vector-menu-heading") 
+            = []
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "data-name" m) == (Just "vector-toc") 
+            = []
+            
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "id" m) == (Just "p-coll-print_export-label") 
+            = []
+            
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "id" m) == (Just "p-lang-btn") 
+            = []
+           
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "id" m) == (Just "p-cactions") 
+            = []
+           
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "id" m) == (Just "p-tb") 
+            = []
+            
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "id" m) == (Just "vector-toc") 
+            = []
+            
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "class" m) == (Just "vector-main-menu-action vector-main-menu-action-lang-alert") 
+            = []
+            
+            
+
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "id" m) == (Just "p-coll-print_export") 
+            = []
+
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "id" m) == (Just "vector-page-tools-dropdown") 
+            = []
+
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "id" m) == (Just "vector-page-tools") 
+            = []
+
+
+{-
+        printPrepareNode (Environment Tag (TagAttr "header" m) _)
+          | (Map.lookup "class" m) == (Just "mw-body-header vector-page-titlebar") 
+            = []
+  -}         
+        
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "class" m) == (Just "vector-pinnable-header vector-toc-pinnable-header vector-pinnable-header-pinned") 
+            = []
+            
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "class" m) == (Just "vector-menu-heading") 
+            = []
+            
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "style" m) == (Just "display:none") 
+            = []
+            
+        printPrepareNode (Environment Tag (TagAttr "button" _) _) 
+           = []
+            
+           
+            
         printPrepareNode (Environment Wikitable (TagAttr "table" m) _)
           | (Map.lookup "class" m) == (Just "navbox") = []
         printPrepareNode (Environment Tag (TagAttr "title" _) _) = []
@@ -1933,8 +2112,13 @@ printPrepareTree ll = concat (map printPrepareNode ll)
           | (Map.lookup "style" m) == (Just "display:none") = []
         printPrepareNode (Environment Tag (TagAttr "div" m) _)
           | (Map.lookup "class" m) == (Just "printfooter") = []
-        printPrepareNode (Environment Wikitable (TagAttr "table" m) l)
-          | maybe False (\x->or (map ($ x) (map isInfixOf ["navbox", "infobox"]))) (Map.lookup "class" m)  = [Environment Wikitable (TagAttr "table" m) (droplinks (printPrepareTree (droplinks l)))]
+
+
+
+
+
+       {-  printPrepareNode (Environment Wikitable (TagAttr "table" m) l)
+          | maybe False (\x->or (map ($ x) (map isInfixOf ["navbox", "infobox"]))) (Map.lookup "class" m)  = [Environment Wikitable (TagAttr "table" m) (droplinks (printPrepareTree vt (droplinks l)))] -}
         printPrepareNode (Environment Tag (TagAttr "span" m) _)
           | (Map.lookup "class" m) == (Just "mw-cite-backlink") = []
         printPrepareNode (Environment Tag (TagAttr "a" m) _)
@@ -1943,6 +2127,8 @@ printPrepareTree ll = concat (map printPrepareNode ll)
           | (Map.lookup "id" m) == (Just "mw-navigation") = []
 
         printPrepareNode (Environment Source _ []) = []
+
+
 
         printPrepareNode (Environment Tag (TagAttr "sup" m) l)
           | (Map.lookup "class" m) == (Just "reference") =
@@ -1955,25 +2141,27 @@ printPrepareTree ll = concat (map printPrepareNode ll)
                               _ -> mzero
                   (mmm, lll) <- case deepGet "a" "class" "image" llll of
                                     [Environment Tag (TagAttr "a" mmm) lll] -> return (mmm, lll)
-                                    _ -> mzero
+                                    _ -> case deepGet "a" "class" "mw-file-description" llll of
+                                             [Environment Tag (TagAttr "a" mmm) lll] -> return (mmm, lll)
+                                             _ -> mzero
                   te <- case deepGet "div" "class" "gallerytext" l of
-                            [Environment Tag (TagAttr "div" _) te] -> return (printPrepareTree te)
+                            [Environment Tag (TagAttr "div" _) te] -> return (printPrepareTree vt te)
                             _ -> mzero
-                  return $ imgfun mmm (printPrepareTree lll) (Just te))
+                  return $ imgfun mmm (printPrepareTree vt lll) (Just te))
               of
                 Just x -> x
-                _ -> printPrepareTree l
+                _ -> printPrepareTree vt l
         printPrepareNode (Environment TableHeadColSep (TagAttr t m) l)
           = [Environment TableHeadColSep (TagAttr t m)
                (
-                  (map (\ x -> Environment Attribute (Attr x) []) (Map.toList m)))]++(printPrepareTree l)
+                  (map (\ x -> Environment Attribute (Attr x) []) (Map.toList m)))]++(printPrepareTree vt l)
         printPrepareNode (Environment TableColSep (TagAttr t m) l)
           = [Environment TableColSep (TagAttr t m)
                (
-                  (map (\ x -> Environment Attribute (Attr x) []) (Map.toList m)))]++(printPrepareTree l)
+                  (map (\ x -> Environment Attribute (Attr x) []) (Map.toList m)))]++(printPrepareTree vt l)
         printPrepareNode (Environment TableRowSep (TagAttr t m) l)
           = [Environment TableRowSep (TagAttr t m)
-               ((map (\ x -> Environment Attribute (Attr x) []) (Map.toList m)))]++(printPrepareTree l)
+               ((map (\ x -> Environment Attribute (Attr x) []) (Map.toList m)))]++(printPrepareTree vt l)
         printPrepareNode (Environment Tag (TagAttr "pre" m) l)
           = [Environment Preformat (TagAttr "pre" m) l]
         printPrepareNode (Environment Tag (TagAttr "span" m) _)
@@ -1990,12 +2178,32 @@ printPrepareTree ll = concat (map printPrepareNode ll)
           | (Map.lookup "id" m) == (Just "footer-icons") = []
         printPrepareNode (Environment Tag (TagAttr "div" m) _)
           | (Map.lookup "id" m) == (Just "mw-panel") = []
+        printPrepareNode (Environment Tag (TagAttr "figure" _) l)
+          = case 
+              (do (l3,m3) <- case deepGet "a" "class" "mw-file-description" l of
+                            [Environment Tag (TagAttr "a" m2) l2] -> return (l2,m2)
+                            _-> mzero
+                  llll <- case deepGetFigCaption l of
+                            [Environment Tag (TagAttr _ _) lll] -> return lll
+                            _-> mzero
+                  return $ imgfun m3 (printPrepareTree vt l3) (Just (printPrepareTree vt llll)))
+             of 
+               Just x -> x  
+               _ -> case (do res <- Just (deepGetFigRes  l)
+                             llll <- case deepGetFigCaption l of
+                                        [Environment Tag (TagAttr _ _) lll] -> return lll
+                                        _-> mzero
+                             return $ [Environment Wikilink (Str "") (res ++[C '|']++ llll)])
+                     of 
+                      Just x -> x
+                      _-> printPrepareTree vt l
         printPrepareNode (Environment Tag (TagAttr "a" m) l)
           = case (Map.lookup "class" m) of
-                (Just "image") -> imgfun m (printPrepareTree l) Nothing
+                (Just "image") -> imgfun m (printPrepareTree vt l) Nothing
+                (Just "mw-file-description") -> imgfun m (printPrepareTree vt l) Nothing
                 _ -> case (Map.lookup "class" m) of
                          (Just "external free") -> [Environment Tag (TagAttr "a" m) []]
-                         _ -> [Environment Tag (TagAttr "a" m) (printPrepareTree l)]
+                         _ -> [Environment Tag (TagAttr "a" m) (printPrepareTree vt l)]
         printPrepareNode (Environment Tag (TagAttr "div" m) _)
           | (Map.lookup "class" m) == (Just "bodyContent") = []
         printPrepareNode (Environment Tag (TagAttr "math" m) l)
@@ -2026,7 +2234,7 @@ printPrepareTree ll = concat (map printPrepareNode ll)
                                 (replace2 (replace2 (replace2 x "&amp;" "&") "&lt;" "<") "gt;"
                                    ">"))]
                 Nothing -> [(Environment Tag (TagAttr "img" m)
-                               (printPrepareTree l))]
+                               (printPrepareTree vt l))]
         printPrepareNode (Environment Tag (TagAttr "div" m) l)
           = case
               do c <- Map.lookup "class" m
@@ -2037,10 +2245,10 @@ printPrepareTree ll = concat (map printPrepareNode ll)
                         (Map.fromList [("lang", (takeWhile (/= ' ') c))]))
                      (deepFlatten l)
               of
-                Nothing -> [Environment Tag (TagAttr "div" m) (printPrepareTree l)]
+                Nothing -> [Environment Tag (TagAttr "div" m) (printPrepareTree vt l)]
                 Just x -> [x]
         printPrepareNode (Environment x y l)
-          = [Environment x y (printPrepareTree l)]
+          = [Environment x y (printPrepareTree vt l)]
         printPrepareNode x = [x]
         
         mypred :: String -> Anything Char -> Bool
@@ -2109,3 +2317,5 @@ printPrepareTree ll = concat (map printPrepareNode ll)
                           Just x -> return $ [C '|'] ++ (map C (x ++ "px"))
                           Nothing -> return []
                  return (Environment Wikilink (Str "") ((map C h) ++ w ++ t))
+                 
+
