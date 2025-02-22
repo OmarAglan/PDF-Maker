@@ -7,7 +7,7 @@ module LatexRenderer
         initialUrlState, makeLables, templateRegistry, baseUrl,
         deepFlatten, wikiLinkCaption, imageSize, isCaption, linewidth,
         generateGalleryImageNumbers, splitToTuples, galleryTableScale,
-        tempProcAdapter, treeToHtml3)
+        tempProcAdapter, treeToHtml3, tabletoodeep)
        where
 import Data.String.HT (trim)
 import Data.List
@@ -296,11 +296,16 @@ treeToHtml4 ll
                return $ prefix ++ d ++ postfix
         nodeToHtml (C c)
           = do st <- get
-               x <- if (c == '\n') && ((lastChar st) == c) then return "</p><p>"
+               x <- if (c == '\n') && ((lastChar st) == c) then return ""
                       else return [c]
                put st{lastChar = c}
                return x
-
+        nodeToHtml (Environment NumHtml (Str s) l) = walk ("&#"++s++";") l ""
+        nodeToHtml (Environment HtmlChar (Str s) _)
+          = return ("&"++s++";") 
+        nodeToHtml (Environment _ (TagAttr "br" _) _) = return "<br />"
+        nodeToHtml (Environment Tag (TagAttr "figure" _) l) = walk "" l ""
+        nodeToHtml (Environment Tag (TagAttr "figcaption" _) _) = return ""
         nodeToHtml (Environment _ (TagAttr x m) l)
           = walk ("<" ++ x ++ " " ++ (writedict  (Map.toList (updateDict m))) ++ ">") l
               ("</" ++ x ++ ">")
@@ -329,7 +334,10 @@ treeToHtml2 ll
         walk4 prefix l postfix
           = do d <- treeToHtml4 l
                return $ prefix ++ d ++ postfix
-        
+        modmap :: Maybe String -> Maybe String
+        modmap Nothing = Just "font-size:50%;"
+        modmap (Just j) = Just ("font-size:50%; "++j)
+
         nodeToHtml :: Anything Char -> HtmlRenderer String
         nodeToHtml (C c)
           = do st <- get
@@ -347,12 +355,12 @@ treeToHtml2 ll
                          st2 <- get
                          put $ st2{getInTab = (getInTab st)}
                          return d
-                 else walk4 ("<" ++ "table" ++ " " ++ (writedict (Map.toList m)) ++ ">") l ("</" ++ "table" ++ ">")
+                 else walk4 ("<" ++ "table" ++ " " ++ (writedict (Map.toList (Map.alter modmap "style" m))) ++ ">") l ("</" ++ "table" ++ ">")
         nodeToHtml (Environment Wikitable (TagAttr "table" m) l)
           = do st<- get 
                if (latexTabs st)
                  then walk ("<table "++ (writedict (Map.toList m))++" ><tr>") l "</tr></table>" 
-                 else walk4 ("<" ++ "table" ++ " " ++ (writedict (Map.toList m)) ++ ">") l ("</" ++ "table" ++ ">")
+                 else walk4 ("<" ++ "table" ++ " " ++ (writedict (Map.toList (Map.alter modmap "style" m))) ++ ">") l ("</" ++ "table" ++ ">")
         nodeToHtml (Environment HtmlChar (Str s) _)
           = return ("&"++s++";")
         nodeToHtml (Environment Wikilink _ l)
@@ -362,6 +370,8 @@ treeToHtml2 ll
                    return $ wikiLinkCaptionHtml l st
         nodeToHtml (Environment Tag (TagAttr "br" _) _) = return "<br/>"
         nodeToHtml (Environment Tag (TagAttr "script" _) _) = return []
+        nodeToHtml (Environment Tag (TagAttr "audio" _) _) = return []
+        
         nodeToHtml (Environment Source (TagAttr _ _) l)
           = do let g = case reverse l of
                            [] -> []
@@ -411,6 +421,11 @@ treeToHtml2 ll
         nodeToHtml (Environment Tag (TagAttr "img" m) _)
           | (Map.lookup "class" m) == (Just "mwe-math-fallback-image-inline")
             = return []
+        nodeToHtml (Environment Tag (TagAttr "img" m) l)
+          | (case (Map.lookup "src" m) of
+                Just str -> (take 2 str) == "//"
+                _ -> False)
+            = nodeToHtml (Environment Tag (TagAttr "img" (Map.adjust (\x->"https:"++x) "src" m)) l)            
         nodeToHtml (Environment Comment _ _) = return []
         nodeToHtml (Environment Preformat (TagAttr "pre" _) l)
           = walk "<pre>" l "</pre>"
@@ -450,7 +465,6 @@ treeToHtml2 ll
                 newst i
                   = (midst i){getGalleryNumbers =
                                 (getGalleryNumbers (midst i)) ++ (map toInteger (gins i))}
-        nodeToHtml (Environment Tag (TagAttr "span" _) l) = walk "" l ""
         nodeToHtml (Environment Tag (TagAttr x m) l)
           = walk ("<" ++ x ++ " " ++ (writedict (Map.toList m)) ++ ">") l
               ("</" ++ x ++ ">")
@@ -465,9 +479,10 @@ linewidth = 80
 {-DHUN| The user can provide her own translation table for mediawiki templates to latex commands. this is done in the templates.user files. This function takes this file in list representation and converts it to the map representation to be able to look up the names of templates DHUN-}
 
 getUserTemplateMap :: [[String]] -> Map String [String]
-getUserTemplateMap input
-  = Map.fromList (map (\ (x : xs) -> (x, xs)) input)
-
+getUserTemplateMap input = Map.fromList (map go input)
+  where
+    go (x : xs) = (x, xs)
+    go [] = ([],[])
 {-DHUN| table may omit tailing columns in a row, but in latex they need to be written out, this function does so DHUN-}
 
 rowaddsym :: TableState -> [Char]
@@ -551,7 +566,7 @@ tableContentToLaTeX ((Environment TableRowSep _ l) : xs)
                      ++
                      (rowaddsym st{currentColumn = c}) ++
                        (rowendsymb ((getInTab sst) <= 1)
-                          ((rowCounter st) == (inputLastRowOfHeader st) - 2))
+                          ((rowCounter st) == (inputLastRowOfHeader st) - 2) (multiRowMap st4))
                           ++
                          (innerHorizontalLine (seperatingLinesRequestedForTable st)
                             (multiRowMap st4)
@@ -560,20 +575,22 @@ tableContentToLaTeX ((Environment TableRowSep _ l) : xs)
            else xx
 tableContentToLaTeX ((Environment TableColSep _ l) : xs)
   = do st <- get
+       outerstate <- lift get
        let cc = (currentColumn st)
        let c = cc + (multiRowCount cc (multiRowMap st))
+       colsym<-tablecolorsym l
        put
          st{lastCellWasNotFirstCellOfRow = True,
             lastCellWasMultiColumn =
               ("" /=
-                 (multiColumnStartSymbol l (columnsWidthList st) c
+                 (multiColumnStartSymbol l (getInTab outerstate) (columnsWidthList st) c
                     (seperatingLinesRequestedForTable st)
                     st)),
             currentColumn = (c + (columnMultiplicityForCounting l)),
             multiRowMap =
               multiRowDictChange (currentColumn st) (multiRowMap st) l,
             lastCellWasMultiRow =
-              (multiRowStartSymbol l (activeColumn st)) /= "",
+              (multiRowStartSymbol l (activeColumn st) outerstate) /= "",
             isFirstRow = False, lastCellWasHeaderCell = False}
        xx <- tableContentToLaTeX xxs
        return $
@@ -581,19 +598,19 @@ tableContentToLaTeX ((Environment TableColSep _ l) : xs)
            (headendsym (lastCellWasHeaderCell st)) ++
              (multiColumnEndSymbol (lastCellWasMultiColumn st)) ++
                (multiRowEndSymbol (lastCellWasMultiRow st)) ++
-                 (columnSeperator (lastCellWasNotFirstCellOfRow st)) ++
+                 (columnSeperator (lastCellWasNotFirstCellOfRow st)) ++ colsym ++
                    (multiRowSymbol (currentColumn st) (multiRowMap st)
                       (seperatingLinesRequestedForTable st)) ++
                                      --       (show (multiRowMap st))++"["++(show (currentColumn st)++"]")++"!"++(show cc)++","++ (show c)++"!"++
 
                       
-                       (multiColumnStartSymbol l (columnsWidthList st) c
+                       (multiColumnStartSymbol l (getInTab outerstate) (columnsWidthList st) c
                         (seperatingLinesRequestedForTable st)
                         st)
                        ++
-                       (multiRowStartSymbol l (activeColumn st)) ++
+                       (multiRowStartSymbol l (activeColumn st) outerstate) ++
                          (if rig then "\\RaggedLeft{}" else "") ++
-                           (tablecolorsym l) ++ hypennothing ++ (varwidthbegin st) ++ xx
+                           hypennothing ++ (varwidthbegin st) ++ xx
   where rig
           = isInfixOf2
               [Environment Attribute (Attr ("style", "text-align:right")) []]
@@ -604,20 +621,22 @@ tableContentToLaTeX ((Environment TableColSep _ l) : xs)
         removesp a = a
 tableContentToLaTeX ((Environment TableHeadColSep _ l) : xs)
   = do st <- get
+       outerstate <- lift get
        let cc = currentColumn st
        let c = cc + (multiRowCount cc (multiRowMap st))
+       colsym<-tablecolorsym l
        put
          st{lastCellWasNotFirstCellOfRow = True,
             lastCellWasMultiColumn =
               ("" /=
-                 (multiColumnStartSymbol l (columnsWidthList st) c
+                 (multiColumnStartSymbol l (getInTab outerstate) (columnsWidthList st) c
                     (seperatingLinesRequestedForTable st)
                     st)),
             currentColumn = (c + (columnMultiplicityForCounting l)),
             multiRowMap =
               multiRowDictChange (currentColumn st) (multiRowMap st) l,
             lastCellWasMultiRow =
-              multiRowStartSymbol l (activeColumn st) /= "",
+              (multiRowStartSymbol l (activeColumn st) outerstate) /= "",
             isFirstRow = False, lastCellWasHeaderCell = True,
             currentRowIsHeaderRow = True}
        xx <- tableContentToLaTeX xs
@@ -626,22 +645,21 @@ tableContentToLaTeX ((Environment TableHeadColSep _ l) : xs)
            (headendsym (lastCellWasHeaderCell st)) ++
              (multiColumnEndSymbol (lastCellWasMultiColumn st)) ++
                (multiRowEndSymbol (lastCellWasMultiRow st)) ++
-                 (columnSeperator (lastCellWasNotFirstCellOfRow st)) ++
+                 (columnSeperator (lastCellWasNotFirstCellOfRow st)) ++ colsym ++
                    (multiRowSymbol (currentColumn st) (multiRowMap st)
                       (seperatingLinesRequestedForTable st))
                      ++
-                     (multiColumnStartSymbol l (columnsWidthList st) c
+                     (multiColumnStartSymbol l (getInTab outerstate) (columnsWidthList st) c
                         (seperatingLinesRequestedForTable st)
                         st)
                        ++
-                       (multiRowStartSymbol l (activeColumn st)) ++
+                       (multiRowStartSymbol l (activeColumn st) outerstate) ++
                          headstartsym ++
-                           (tablecolorsym l) ++ hypennothing ++ (varwidthbegin st) ++ xx
+                           hypennothing ++ (varwidthbegin st) ++ xx
 tableContentToLaTeX (x : xs)
   = do st <- get
        ele <- case (activeColumn st) of
-                  Just n | (n /= fromIntegral (currentColumn st)) ||
-                             (lastCellWasMultiColumn st)
+                  Just n | (n /= fromIntegral (currentColumn st)) 
                            -> return []
                   _ -> lift $ treeToLaTeX2 [x]
        xx <- tableContentToLaTeX xs
@@ -682,16 +700,21 @@ hypennothing = "\\hspace*{0pt}\\ignorespaces{}\\hspace*{0pt}"
 
 {-DHUN| color cell in latex if HTML attribute bgcolor is present in the parse tree for the cell DHUN-}
 
-tablecolorsym :: [Anything Char] -> [Char]
+tablecolorsym :: [Anything Char] -> (StateT TableState (State MyState) String)
 tablecolorsym ll
   = case genLookup "bgcolor" ll of
-        Just x -> case x of
-                      ('#' : ys) -> let (p, colname, col) = colinfo ('l' : 'l' : ys) in
-                                      if p then "\\cellcolor[rgb]" ++ col else
-                                        "\\cellcolor{" ++ colname ++ "}"
-                      _ -> "\\cellcolor{" ++ x ++ "}"
-        Nothing -> ""
-
+        Just x -> case remh x of
+                       ys -> let (p, _, col) = colinfo ('l' : 'l' : ys) in
+                                      if p then do st<-lift get
+                                                   lift (put st{htmlColors=Map.insert (s col) col (htmlColors st)})
+                                                   return ("\\SetCell{bg=" ++  (s col)++"}") 
+                                           else return ("\\SetCell{bg=" ++ x ++ "}")
+        Nothing -> return ""
+ where 
+   s c="c" ++ (filter (\x->not (x `elem` "}{,")) c)
+   remh x = case x of 
+             ('#' : ys)->ys
+             ys ->ys
 {-DHUN| the caption of a table is given in |+ or <th> elements, it needs to be reformatted in the parse in oder to be rendered in latex as a multicolumn cell spanning the whole width of the table DHUN-}
 
 reformatTableCaption ::
@@ -765,17 +788,17 @@ wdth3 _ _ = ([], 1.0)
 
 {-DHUN| Returns a table header which represents the width of the columns of a table in units of the line width with the proper corrections for use in the a latex documents. If the first boolean input parameter is true the table is understood to be written in landscape mode. It also take a map of Int to Double. This is the list of the maximum width of columns determined by  previous runs of latex on the table with only one column included per run. If second boolean parameter is true it is understood the the rule should be printed with the table, otherwise the table should be printed without rules DHUN-}
 
-wdth2 :: Bool -> Map Int Double -> Bool -> Float -> String
-wdth2 ls m b f
+wdth2 :: Int -> Bool -> Map Int Double -> Bool -> Float -> String
+wdth2 i ls m b f
   | m /= Map.empty =
-    tableSpecifier b
+    tableSpecifier i b
       (map
          ((* (f*(1.0 - (scalefactor (fromIntegral n))))) .
             double2Float . (/ (linew2 ls)))
          (Map.elems mm))
   where n = (maximum (Map.keys m))
         (mm, _) = wdth ls n m
-wdth2 _ _ _ _ = []
+wdth2 _ _ _ _ _ = []
 
 {-DHUN| takes the list of maximum column widths created by previous runs of the latex compiler with only one columns included per run as map from Int to Double. Take the total number of columns of the table as Int. The table is understood to be printed in landscape mode if the boolean parameter is true. It returns a map from int to double representing the width of columns of the table to be used in the latex documents. So it takes raw widths. Which are just the width of the column if the width of the paper was infinite and return the width that fit on the finite width of the real paper DHUN-}
 
@@ -814,7 +837,7 @@ wdth ls n mm
                Nothing)
         hlp (_, i)
           | ((i == 3) || (i == n)) =
-            let (mmm, dd) = (wdth ls n (Map.map ((\ x -> x * 0.95)) mm)) in
+            let (mmm, dd) = (wdth ls n (Map.map ((\ x -> x * 0.965*0.965)) mm)) in
               Just (mmm, Just ((0.965) * dd))
         hlp (m, i)
           | ((sum (Map.elems m)) :: Double) +
@@ -843,15 +866,33 @@ mapToLaTeX  l2=
   do st<- get
      do let  (output,_) =treeToHtml3 (Map.fromList []) (langu st) "" l2 st
         put st{htmlMaps=(htmlMaps st)++[output]}
+        _<-myfun l2
         let n=(1+(length (htmlMaps st)))
         return ("\n\n\\begin{minipage}{\\textwidth}\n\\begin{center}\n\\includegraphics[width=1.0\\textwidth,height=8.0in,keepaspectratio]{../map"++(show n) ++".pdf}\n\nCopyright OpenStreetMap\\end{center}\n\\raggedright{}\n\\end{minipage}\n\\vspace{0.75cm}\n\n")
+  where
+    myfun [(Environment Tag (TagAttr "div" _) l3)] = treeToLaTeX2 l3
+    myfun _ = return []
 
 tableToLaTeXNew :: [Anything Char] -> Bool -> String -> Maybe Float -> [Anything Char] -> Renderer String 
 tableToLaTeXNew  l1 b s m l2=
   do st<- get
-     if (latexTabs st) then tableToLaTeX l1 b s m else   (
+     if (latexTabs st)||(not ((havepos l1)|| (tabletoodeep l1) )) then 
+                                             do tableToLaTeX (if (latexTabs st) then l1 else (printPrepareTree False l1)) b s m
+                                           else   (
        do let  (output,_) =treeToHtml3 (Map.fromList []) (langu st) "" l2 st
           _<-tableToLaTeX (printPrepareTree False l1) b s m
+          st2<-get
+          put st2{htmlTables=(htmlTables st)++[output]}
+          let n=(1+(length (htmlTables st)))
+          return ("\n\n\\begin{minipage}{\\textwidth}\n\\begin{center}\n\\includegraphics[width=1.0\\textwidth,height=8.0in,keepaspectratio]{../table"++(show n) ++".pdf}\n\\end{center}\n\\raggedright{}\n\\end{minipage}\n\\vspace{0.75cm}\n\n"))
+
+
+posToLaTeX :: [Anything Char] -> Renderer String 
+posToLaTeX  l1 =
+  do st<- get
+     if (latexTabs st) then treeToLaTeX2 l1  else   (
+       do let  (output,_) =treeToHtml3 (Map.fromList []) (langu st) "" l1 st
+          _<-treeToLaTeX2 l1
           st2<-get
           put st2{htmlTables=(htmlTables st)++[output]}
           let n=(1+(length (htmlTables st)))
@@ -880,9 +921,9 @@ tableToLaTeX l1 b s m
            l = l1 --stripempty l1 st
            spec
              = case Map.lookup tbno (tabmap st) of
-                   Nothing -> (if (tableSpecifier sep widths) == "" then
-                                 "p{\\linewidth}" else tableSpecifier sep widths)
-                   Just t -> wdth2 lsc (Map.map ((if b then 0.5 else 1.0)*) t) sep (if b then 0.5 else 1.0)
+                   Nothing -> (if (tableSpecifier (getInTab st) sep widths) == "" then
+                                 "p{\\linewidth}" else tableSpecifier (getInTab st) sep widths)
+                   Just t -> wdth2 (getInTab st) lsc (Map.map ((if b then 0.5 else 1.0)*) t) sep (if b then 0.5 else 1.0)
            sep = seperatingLinesRequested s
            hline = horizontalLine sep
            widths = case m of
@@ -894,8 +935,7 @@ tableToLaTeX l1 b s m
                    Just t -> wdth3 lsc t
            env = tableEnvironment (getF st)
            scriptsize
-             = (isInfixOf2 "latexfontsize=\"scriptsize\"" s) ||
-                 ((numberOfColumns l) > 5)
+             = (isInfixOf2 "latexfontsize=\"scriptsize\"" s)
            sb = if scriptsize then "{\\scriptsize{}" else ""
            se = if scriptsize then "}" else ""
            lsc
@@ -917,10 +957,16 @@ tableToLaTeX l1 b s m
                           lastRowHadEmptyMultiRowMap = True,
                           outputTableHasHeaderRows = False, activeColumn = Nothing}
        if spec == "" then return () else put $ newstate{getF = getF st}
+       ssst<-get
+       footnotes<- if ((footnoteMap ssst)/=Map.empty)&&(env == "longtable")&&(not (getInCaption st)) 
+         then 
+           do put ssst{footnoteMap=Map.empty}
+              return $ intercalate "\n" (Map.elems (footnoteMap ssst)) 
+         else return ""
        r <- if spec == "" then treeToLaTeX2 l else  return $
               lsb ++
                 sb ++
-                  (if (env /= "tabular") then "\n" else "\\scalebox{0.85}{") ++
+                  (if (env /= "tabular") then "\n" else "\\scalebox{1.0}{") ++
                     (if fontscalefactor == 1.0 then "" else
                        "{\\scalefont{" ++ (printf "%0.5f" fontscalefactor) ++ "}")
                       ++
@@ -938,7 +984,7 @@ tableToLaTeX l1 b s m
                                             "}\n" ++
                                               (if fontscalefactor == 1.0 then "" else "}") ++
                                                 (if (env /= "tabular") then "" else "}") ++
-                                                  se ++ lse ++ (if (env == "tabular") then " " else "")
+                                                  se ++ lse ++ (if (env == "tabular") then " " else "")++footnotes
        return r
 
 {-DHUN| Converts an image from the parse tree to latex. The actual images is only referenced in the wiki source, as well as the parse tree, as well as the latex source. It takes a parse tree representation of the image as only input parameter. The return type is Renderer String. Which means that it returns a string but also take a state as additional monadic input parameter and returns a possible changed version of it as additional return parameter monadically DHUN-}
@@ -946,6 +992,17 @@ tableToLaTeX l1 b s m
 wikiImageToLaTeX :: [Anything Char] -> Renderer String
 wikiImageToLaTeX l
   = do st <- get
+       put
+         st{getImages = (getImages st) ++ [shallowFlatten l],
+            getJ = ((getJ st) + 1)}
+       sy <- s
+       ssst <- get
+       footnotes<- if ((footnoteMap ssst)/=Map.empty)&&((getInTab ssst) == 0)&&(not (getInCaption ssst)) 
+         then 
+           do put ssst{footnoteMap=Map.empty}
+              return $ intercalate "\n" (Map.elems (footnoteMap ssst)) 
+         else return ""
+
        mystr <- return $
                   (if not (micro st) then
                      "\n" ++
@@ -969,10 +1026,10 @@ wikiImageToLaTeX l
                                            else "")
                                           ++
                                           (if not (micro st) then
-                                             (if (s st) == "" then
+                                             (if sy == "" then
                                                 "\\myfigurewithoutcaption{" ++ (n st) ++ "}" else
                                                 "\\myfigurewithcaption{" ++
-                                                  (n st) ++ "}{" ++ (s st) ++ "}")
+                                                  (n st) ++ "}{" ++ sy ++ "}")
                                              else "")
                                             ++
                                             (if not (micro st) then "\n\\end{minipage}" else "") ++
@@ -981,24 +1038,21 @@ wikiImageToLaTeX l
                                                    (if ((getInTab st) == 0) then "\n" else "") ++
                                                      "\n"
                                                    else " ")
-       put
-         st{getImages = (getImages st) ++ [shallowFlatten l],
-            getJ = ((getJ st) + 1)}
-       return mystr
+       return (mystr++footnotes)
   where ext
           = normalizeExtension
               (map toLower
                  (fileNameToExtension (headSplitEq '|' (shallowFlatten l))))
-        s st
-          = if (trim (s1 st)) `elem` ["verweis=", "alt=", "link="] then ""
-              else (s1 st)
-        s2 st
+        s :: Renderer String
+        s   = do sz<-s1   
+                 if (trim sz) `elem` ["verweis=", "alt=", "link="] then return ""  else return sz
+        s2 :: Renderer String
+        s2 
           = case Map.lookup "alt" (snd (prepateTemplate l "x")) of
-                Just xx -> wikiLinkCaption xx st
-                Nothing -> wikiLinkCaption l st
-        s1 st
-          = if '|' `elem` (shallowFlatten l) then (s2 st) else
-              (treeToLaTeX [] st{getJ = ((getJ st) + 1)})
+                Just xx -> wikiLinkCaption2 xx
+                Nothing -> wikiLinkCaption2 l
+        s1 :: Renderer String
+        s1 = if '|' `elem` (shallowFlatten l) then s2 else (return "")
         mysize st = printf "%0.5f" (mysizefloat2 st)
         mysizefloat st = (min (getF st) (imageSize l))
         mysizefloat2 st = if (msb st) then 1.0 else (mysizefloat st)
@@ -1014,34 +1068,66 @@ wikiImageToLaTeX l
 
 wikiLinkCaption :: [Anything Char] -> MyState -> String
 wikiLinkCaption l st = if isCaption x then rebuild x else ""
-  where x = (treeToLaTeX (last (splitOn [C '|'] l)) st{getInCaption=True})
+  where x = (treeToLaTeX (last (splitOn [C '|'] l)) st{getCaptionLevel=1 + (getCaptionLevel st)})
         rebuild (':' : xs) = xs
         rebuild b = b
 
+wikiLinkCaption2 :: [Anything Char] -> Renderer String
+wikiLinkCaption2 l = do st <-get
+                        put st{getCaptionLevel = 1 + (getCaptionLevel st)}
+                        x <-(treeToLaTeX2 (last (splitOn [C '|'] l)) )
+                        out <-if isCaption x then return (rebuild x) else return ""
+                        st2<-get
+                        put st2{getCaptionLevel = (getCaptionLevel st2) - 1}
+                        return out
+  where 
+    rebuild (':' : xs) = xs
+    rebuild b = b
+
+
 {-DHUN| Returns the LaTeX representation of a wikilink. Takes a parse tree representation of the wikilink and the current state of the render. A Wikilink is represented as [[FooBar]] in Wiki notation. DHUN-}
 
-wikiLinkToLaTeX :: [Anything Char] -> MyState -> String
+wikiLinkToLaTeX :: [Anything Char] -> MyState -> (String, MyState)
 wikiLinkToLaTeX l st
-  = case
-      Map.lookup (map toUpper (finalloc st))
-        (Map.mapKeys (map toUpper) (urls st))
-      of
-        Just yy -> "\\my" ++
-                     addit ++ "lref{" ++ yy ++ "}{" ++ (wikiLinkCaption l st) ++ "}"
-        Nothing -> case
-                     do hh <- maybeHead . (splitOn "#") . (map toUpper) $ (finalloc st)
-                        Map.lookup (Just hh)
-                          (Map.mapKeys (maybeHead . (splitOn "#") . (map toUpper)) (urls st))
-                     of
-                       Just yy -> "\\my" ++
-                                    addit ++ "lref{" ++ yy ++ "}{" ++ (wikiLinkCaption l st) ++ "}"
-                       Nothing -> "\\my" ++
-                                    addit ++
-                                      "href{" ++
-                                        (wikiLinkLocationesc l st) ++
-                                          "}{" ++ (killnl (wikiLinkCaption l st)) ++ "}"
-  where zzz sssst
-          = case localWikiLinkLocation (loc) of
+  = runState (wikiLinkToLaTeX2 l) st
+
+makeFootNoteRef::String->String->String->Renderer String
+makeFootNoteRef add target caption
+  = do st<-get
+       put st{footnoteNumber=(footnoteNumber st)+1}
+       let number = show (footnoteNumber st)
+       if (getInFootnote st) 
+         then
+           return $ "\\myfn"++add++"ref{" ++ target ++ "}{" ++ caption ++ "}" 
+         else
+           do put st{footnoteNumber=(footnoteNumber st)+1} 
+              if ((getInTab st) > 0) || (getInCaption st)
+                then
+                  do sst<-get
+                     put sst{footnoteMap=Map.insert (footnoteNumber st) ("\\my"++add++"ref{"++number++"}{"++target++"}")(footnoteMap sst)}
+                     return $ caption++"\\footnotemark["++number++"]"                
+                else
+                  return $ caption++"\\footnotemark["++number++"]"++"\\my"++add++"ref{"++number++"}{"++target++"}"
+
+
+
+wikiLinkToLaTeX2 :: [Anything Char] -> Renderer String
+wikiLinkToLaTeX2 l
+  = do st<-get
+       case
+        Map.lookup (map toUpper (finalloc st))
+          (Map.mapKeys (map toUpper) (urls st))
+         of
+          Just yy -> makeFootNoteRef "l" yy (wikiLinkCaption l st) 
+          Nothing -> case
+                       do hh <- maybeHead . (splitOn "#") . (map toUpper) $ (finalloc st)
+                          Map.lookup (Just hh)
+                            (Map.mapKeys (maybeHead . (splitOn "#") . (map toUpper)) (urls st))
+                       of
+                         Just yy -> makeFootNoteRef "l" yy (wikiLinkCaption l st) 
+                         Nothing -> makeFootNoteRef "h" (wikiLinkLocationesc l st) (killnl (wikiLinkCaption l st))  
+  where zzz sssst 
+          = case localWikiLinkLocation (loc sssst) of
                 ('#' : xs) -> (currentUrl sssst) ++ ('#' : xs)
                 xs -> xs
         finalloc3 sts = replace2 (trim (zzz sts)) " " "_"
@@ -1049,19 +1135,18 @@ wikiLinkToLaTeX l st
           = case reverse (finalloc3 ssst) of
                 ('/' : xs) -> reverse xs
                 _ -> finalloc3 ssst
-        restpath
+        restpath st
           = intercalate "/"
               (reverse (drop len (reverse (splitOn "/" (currentUrl st)))))
-        loc = if len > 0 then restpath ++ "/" ++ rest else rest
+        loc st = if len > 0 then (restpath st) ++ "/" ++ rest else rest
         (len, rest) = doit2 0 (shallowFlatten l)
         doit2 n ('.' : ('.' : ('/' : xs))) = doit2 (n + 1) xs
         doit2 n xs = (n, xs)
-        addit
-          = if getInFootnote st then "fn" else
-              if ((getInTab st) > 1) then "tab" else ""
         killnl ('\n' : ('\n' : xs)) = killnl ('\n' : xs)
         killnl (x : xs) = x : (killnl xs)
         killnl [] = []
+
+
 
 {-DHUN| If repeated newlines appear in a string directly after each other. Each series of newlines is reduced to exactly one newline DHUN-}
 
@@ -1088,19 +1173,25 @@ linkCaption l st s b
 
 {-DHUN| returns the latex representation of a link. A link is represented as [foobar.com mycaption] in wiki notation. It takes the parse tree representation of the link as first input parameter. The second input parameter is the current state of the renderer. The third parameter is the Uri scheme as string (See 'URI scheme' in the English wikipeda) usually this is 'http'. It returns the latex representation of the link as string DHUN-}
 
-linkToLaTeX :: [Anything Char] -> MyState -> String -> String
-linkToLaTeX l st s
-  = if
-      (b && cap == "") || (cap == (s ++ (escapelink (linkLocation l))))
-      then "\\myplainurl{" ++ s ++ (escapelink (linkLocation l)) ++ "}"
-      else
-      "\\my" ++
-        addit ++
-          "href{" ++ s ++ (escapelink (linkLocation l)) ++ "}{" ++ cap ++ "}"
-  where addit = if b then "fn" else ""
-        b = getInFootnote st
-        cap = (linkCaption l st s b)
+linkToLaTeX :: [Anything Char] -> String -> MyState -> (String, MyState)
+linkToLaTeX l s st
+  = runState (linkToLaTeX2 l s) st
 
+
+linkToLaTeX2 :: [Anything Char] -> String -> Renderer String
+linkToLaTeX2 l s
+  = do st<-get
+       if  ((b st) && (cap st) == "") || ((cap st) == (s ++ (escapelink (linkLocation l))))
+        then return $ "\\myplainurl{" ++ s ++ (escapelink (linkLocation l)) ++ "}"
+        else
+         if addit st=="" then
+         makeFootNoteRef "h"  (s++(escapelink (linkLocation l))) (cap st)
+         else return $ "\\my" ++
+                          (addit st) ++
+                            "href{" ++ s ++ (escapelink (linkLocation l)) ++ "}{" ++ (cap st) ++ "}"
+  where addit st = if (b st) then "fn" else ""
+        b st = getInFootnote st
+        cap st = (linkCaption l st s (b st))
 {-DHUN| takes a list and splits it into sublist of equal length, allowing a possible smaller length for the last list in case the devision does not create an integer result. DHUN-}
 
 splitToTuples :: [a] -> [[a]]
@@ -1126,7 +1217,7 @@ galleryTableSpecifier :: String
 galleryTableSpecifier
   = concat $
       replicate galleryNumberOfColumns
-        ">{\\RaggedRight}p{0.5\\linewidth}"
+        "p{0.5\\linewidth}"
 
 {-DHUN| converts the inner parts gallery (image gallery, gallery tag) from parse tree notation to latex, does not write the latex table header and footer. This is only a helper function. Always use galleryToLatex if you want to convert a gallery to latex DHUN-}
 
@@ -1240,15 +1331,15 @@ templateToLatex l s
   = state $
       \ st ->
         case l of
-            ((C 'w') : ((C '|') : xs)) -> (wikiLinkToLaTeX
+            ((C 'w') : ((C '|') : xs)) -> wikiLinkToLaTeX
                                              ((C 'w') : (C ':') : xs)
-                                             st,
-                                           st)
-            ((C 'W') : ((C '|') : xs)) -> (wikiLinkToLaTeX
+                                             st
+                                           
+            ((C 'W') : ((C '|') : xs)) -> wikiLinkToLaTeX
                                              ((C 'w') : (C ':') : xs)
-                                             st,
-                                           st)
-            ((C 'B') : ((C '|') : xs)) -> (wikiLinkToLaTeX xs st, st)
+                                             st
+                                           
+            ((C 'B') : ((C '|') : xs)) -> wikiLinkToLaTeX xs st
             _ -> swap $ templateProcessor st (prepateTemplate l s)
 
 mnfindentlatex :: Map String [Anything Char] -> Renderer String
@@ -1356,16 +1447,18 @@ trilexgen st ll code
 {-DHUN| analyzes a color in HTML notation. It returns a triple. The first element is a boolean. If it is true the color has got rgb hex notation and the third parameter contains the rgb latex notation. If it is false, the color is not rgb and hopefully a HTML color name, which is returned a second element of the tuple DHUN-}
 
 colinfo :: String -> (Bool, String, String)
-colinfo colcode
+colinfo colcode2
   = case col of
         Just colo -> (True, map toLower colname, colo)
         Nothing -> (False, map toLower colname,
                     case colnamehelper of
                         Just x -> x
-                        Nothing -> colcode)
-  where col = (makecol colnamehelper)
+                        Nothing -> colcode2)
+  where colcode = if length colcode2==7 then ('l':colcode2) else colcode2
+        col = (makecol colnamehelper)
         colnamehelper
           = case colcode of
+                ('#' : gs) -> Just gs
                 (_ : (_ : gs)) -> Just gs
                 _ -> Nothing
         colname
@@ -1375,7 +1468,7 @@ colinfo colcode
                  return ("rgb" ++ n)
               of
                 Just x -> x
-                Nothing -> colcode
+                Nothing -> colcode2
         
         ss :: String -> [Integer]
         ss (a : (b : xs)) = (maybeToList . Tools.unhex $ [a, b]) ++ (ss xs)
@@ -1452,9 +1545,8 @@ templateProcessor ::
                   MyState ->
                     (String, Map String [Anything Char]) -> (MyState, String)
 templateProcessor st ("main", ll)
-  = (st,
-     "Main Page: " ++
-       (wikiLinkToLaTeX (Map.findWithDefault [] "1" ll) st))
+  = let (x,sst)=wikiLinkToLaTeX (Map.findWithDefault [] "1" ll) st in
+     (sst,"Main Page: " ++ x)
 templateProcessor st ("#invoke:Mathe f\252r Nicht-Freaks/Seite", _)
   = (st, "")
 templateProcessor st ("#invoke:Liste", _) = (st, "")
@@ -1486,6 +1578,31 @@ templateProcessor st ("Aufgabensammlung: Vorlage:Frage", ll)
                       "\\NFFrage{" ++ a ++ "}{" ++ b ++ "}{" ++ c ++ "}" else
                       "\\NFFrageB{" ++ b ++ "}{" ++ c ++ "}")
               st
+templateProcessor st ("example", ll)
+  = (st2, r)
+  where j1 x = (Map.findWithDefault [] x ll)
+        (r, st2)
+          = runState
+              (do a <- treeToLaTeX2 (j1 "1")
+                  b <- treeToLaTeX2 (j1 "2")
+                  return $
+                    if Map.member "2" ll then
+                      "\\LaTeXDoubleBoxTemplate{Example (" ++ a ++ "):}{" ++ b ++ "}" else
+                      "\\LaTeXDoubleBoxTemplate{Example:}{" ++ a ++ "}")
+              st
+templateProcessor st ("box", ll)
+  = (st2, r)
+  where j1 x = (Map.findWithDefault [] x ll)
+        (r, st2)
+          = runState
+              (do a <- treeToLaTeX2 (j1 "1")
+                  b <- treeToLaTeX2 (j1 "title")
+                  c <- treeToLaTeX2 (j1 "note")
+                  return $
+                    if Map.member "title" ll then
+                      "\\LaTeXDoubleBoxTemplate{" ++ b ++ "}{" ++ a ++ c ++ "}" else
+                      "\\LaTeXZeroBoxTemplate{" ++ a ++ c ++ "}")
+              st
 templateProcessor st
   ("Mathe f\252r Nicht-Freaks: Vorlage:Mind Map", ll)
   = (st2,
@@ -1500,7 +1617,7 @@ templateProcessor st
               st
 templateProcessor st
   ("C++-Programmierung/ Vorlage:Buchinterner Link", ll)
-  = (st,
+  = swap (
      wikiLinkToLaTeX
        (if
           ("" /=
@@ -1591,7 +1708,7 @@ templateProcessor st ("Komplexe Zahlen/ Vorlage:Formel", ll)
      (treeToLaTeX (shallowEnlargeMath (Map.findWithDefault [] "1" ll))
         st))
 templateProcessor st ("Ada/95/RM", ll)
-  = (st,
+  = swap (
      (linkToLaTeX
         ((map C
             "http://www.adaic.org/resources/add_content/standards/95lrm/ARM_HTML/RM-")
@@ -1604,13 +1721,13 @@ templateProcessor st ("Ada/95/RM", ll)
                      (if has then one ++ [C '.'] ++ two else
                         (map C "Annex ") ++ one ++ [C ':'])
                        ++ [C ' '] ++ (Map.findWithDefault [] "title" ll))
-        st
-        ""))
+        "" st
+        ))
   where one = (Map.findWithDefault [] "1" ll)
         two = (Map.findWithDefault [] "2" ll)
         has = Map.member "2" ll
 templateProcessor st ("Ada/2005/RM", ll)
-  = (st,
+  = swap (
      (linkToLaTeX
         ((map C
             "http://www.adaic.org/resources/add_content/standards/05rm/html/RM-2-")
@@ -1623,13 +1740,12 @@ templateProcessor st ("Ada/2005/RM", ll)
                      (if has then one ++ [C '.'] ++ two else
                         (map C "Annex ") ++ one ++ [C ':'])
                        ++ [C ' '] ++ (Map.findWithDefault [] "title" ll))
-        st
-        ""))
+        "" st))
   where one = (Map.findWithDefault [] "1" ll)
         two = (Map.findWithDefault [] "2" ll)
         has = Map.member "2" ll
 templateProcessor st ("Ada/2012/RM", ll)
-  = (st,
+  = swap (
      (linkToLaTeX
         ((map C "http://www.ada-auth.org/standards/12rm/html/RM-") ++
            one ++
@@ -1640,8 +1756,8 @@ templateProcessor st ("Ada/2012/RM", ll)
                      (if has then one ++ [C '.'] ++ two else
                         (map C "Annex ") ++ one ++ [C ':'])
                        ++ [C ' '] ++ (Map.findWithDefault [] "title" ll))
-        st
-        ""))
+        "" st
+        ))
   where one = (Map.findWithDefault [] "1" ll)
         two = (Map.findWithDefault [] "2" ll)
         has = Map.member "2" ll
@@ -1790,11 +1906,10 @@ templateProcessor st
   ("Praktikum Anorganische Chemie/ Vorlage:Gift", _)
   = (st, "{\\bfseries Gefahrstoffwarnung! $\\skull$ }")
 templateProcessor st ("Wikibooks", ll)
-  = (st, wikiLinkToLaTeX ((Map.findWithDefault [] "1" ll)) st)
+  =  swap (wikiLinkToLaTeX ((Map.findWithDefault [] "1" ll)) st)
 templateProcessor st ("See also", ll)
-  = (st,
-     "See also: " ++
-       (wikiLinkToLaTeX ((Map.findWithDefault [] "1" ll)) st))
+  = let (x,sst)= (wikiLinkToLaTeX ((Map.findWithDefault [] "1" ll)) st) in (sst,
+     "See also: " ++ x)
 templateProcessor st ("info", ll)
   = (st,
      "\\begin{TemplateInfo}{}{}" ++
@@ -1960,6 +2075,18 @@ templateProcessor st ("C++-Programmierung/ Vorlage:Syntax", ll)
   = (st,
      "{\\ttfamily {\\scriptsize " ++
        (treeToLaTeX (breakLines3 96 (Map.findWithDefault [] "code" ll))
+          st)
+         ++ "}}\n")
+templateProcessor st ("Java", ll)
+  = (st,
+     "{\\ttfamily {\\scriptsize " ++
+       (treeToLaTeX (breakLines3 96 (Map.findWithDefault [] "code" ll))
+          st)
+         ++ "}}\n")
+templateProcessor st ("XCode", ll)
+  = (st,
+     "{\\ttfamily {\\scriptsize " ++
+       (treeToLaTeX (breakLines3 96 (Map.findWithDefault [] "1" ll))
           st)
          ++ "}}\n")
 templateProcessor st
@@ -2249,26 +2376,19 @@ templateProcessor st ("cite news", ll)
   = (tempProcAdapter $ citearticle ll) st
 templateProcessor st ("Druckversionsnotiz", _) = (st, "")
 templateProcessor st ("meta", ll)
-  = (st,
+  = swap (
      wikiLinkToLaTeX
        ((C 'm') : (C ':') : (Map.findWithDefault [] "1" ll))
        st)
 templateProcessor st ("Wikipedia", ll)
-  = (st,
+  = swap (
      wikiLinkToLaTeX
        ((C 'w') : (C ':') : (Map.findWithDefault [] "1" ll))
        st)
 templateProcessor st ("Wikipedia2", ll)
-  = (st,
-     (wikiLinkToLaTeX
-        ((C 'w') : (C ':') : (Map.findWithDefault [] "1" ll))
-        st)
-       ++
-       (wikiLinkToLaTeX
-          ((C 'w') : (C ':') : (Map.findWithDefault [] "2" ll))
-          st))
+  = let (x,sst)=  (wikiLinkToLaTeX ((C 'w') : (C ':') : (Map.findWithDefault [] "1" ll)) st) in let (y,ssst) =  (wikiLinkToLaTeX ((C 'w') : (C ':') : (Map.findWithDefault [] "2" ll)) sst) in (ssst, x++y)
 templateProcessor st ("GLSL Programming Unity SectionRef", ll)
-  = (st,
+  = swap (
      wikiLinkToLaTeX ((map (C) xx) ++ (Map.findWithDefault [] "1" ll))
        st)
   where xx
@@ -2279,13 +2399,13 @@ templateProcessor st ("GLSL Programming Unity SectionRef", ll)
                  "Rasterization", "Per-Fragment Operations"]
               then "GLSL Programming/" else "GLSL Programming/Unity/"
 templateProcessor st ("S", ll)
-  = (st,
+  = swap (
      wikiLinkToLaTeX
        (((C 's') : (C ':') : (Map.findWithDefault [] "1" ll)) ++
           [C '|'] ++ (Map.findWithDefault [] "2" ll))
        st)
 templateProcessor st ("wiktionary", ll)
-  = (st,
+  = swap (
      wikiLinkToLaTeX
        ((C 'w') :
           (C 'i') :
@@ -2301,42 +2421,42 @@ templateProcessor st ("indent", ll) = (st, go)
                               (concat (genericReplicate n "{$\\text{ }$}"))
                 _ -> "\\newline{}"
 templateProcessor st ("wikipedia", ll)
-  = (st,
+  = swap (
      wikiLinkToLaTeX
        ((C 'w') : (C ':') : (Map.findWithDefault [] "1" ll))
        st)
 templateProcessor st ("Wikiversity", ll)
-  = (st,
+  = swap (
      wikiLinkToLaTeX
        ((C 'v') : (C ':') : (Map.findWithDefault [] "1" ll))
        st)
 templateProcessor st ("wikiquote", ll)
-  = (st,
+  = swap  (
      wikiLinkToLaTeX
        ((C 'q') : (C ':') : (Map.findWithDefault [] "1" ll))
        st)
 templateProcessor st ("W", ll)
-  = (st,
+  = swap  (
      wikiLinkToLaTeX
        ((C 'w') : (C ':') : (Map.findWithDefault [] "1" ll))
        st)
 templateProcessor st ("wp", ll)
-  = (st,
+  = swap (
      wikiLinkToLaTeX
        ((C 'w') : (C ':') : (Map.findWithDefault [] "1" ll))
        st)
 templateProcessor st ("B", ll)
-  = (st,
+  = swap  (
      wikiLinkToLaTeX
        ((C 'b') : (C ':') : (Map.findWithDefault [] "1" ll))
        st)
 templateProcessor st ("Wikipedia-inline", ll)
-  = (st,
+  = swap  (
      wikiLinkToLaTeX
        ((C 'w') : (C ':') : (Map.findWithDefault [] "1" ll))
        st)
 templateProcessor st ("Wiktionary", ll)
-  = (st,
+  = swap (
      wikiLinkToLaTeX
        ((map C "wiktionary") ++
           ((C ':') : (Map.findWithDefault [] "1" ll)))
@@ -2369,18 +2489,16 @@ templateProcessor st ("Template:B3D:N2P/VTT1", ll) = (st2, r)
                                 (Map.findWithDefault [] "imageWidth" ll) ++
                                   [C '|'] ++ (Map.findWithDefault [] "text3" ll)))
               st
-templateProcessor st ("Vorlage:Referenzen Zitat", ll) = (st, r)
-  where r = (wikiLinkToLaTeX
+templateProcessor st ("Vorlage:Referenzen Zitat", ll) = swap (wikiLinkToLaTeX
                ((Map.findWithDefault [] "1" ll) ++
                   [C '|', C '['] ++ (Map.findWithDefault [] "2" ll) ++ [C ']'])
                st)
-templateProcessor st ("Referenzen Zitat", ll) = (st, r)
-  where r = (wikiLinkToLaTeX
+templateProcessor st ("Referenzen Zitat", ll) = swap (wikiLinkToLaTeX
                ((Map.findWithDefault [] "1" ll) ++
                   [C '|', C '['] ++ (Map.findWithDefault [] "2" ll) ++ [C ']'])
                st)
 templateProcessor st ("wikipediapar", ll)
-  = (st,
+  = swap (
      wikiLinkToLaTeX
        ((C 'w') :
           (C ':') :
@@ -2388,7 +2506,7 @@ templateProcessor st ("wikipediapar", ll)
                ll))
        st)
 templateProcessor st ("Wikipediapar", ll)
-  = (st,
+  = swap (
      wikiLinkToLaTeX
        ((C 'w') :
           (C ':') :
@@ -2502,9 +2620,9 @@ templateProcessor st ("Druckversion Titelseite", ll)
 templateProcessor st ('j' : ('a' : ('v' : ('a' : (':' : xs)))), ll)
   = (tempProcAdapter $ javakeyword xs ll "java:") st
 templateProcessor st ('J' : ('a' : ('v' : ('a' : (':' : xs)))), ll)
-  = (tempProcAdapter $ javakeyword xs ll "Java:") st
+  = (tempProcAdapter $ javakeyword xs ll "java:") st
 templateProcessor st ("Haskell lib", ll)
-  = (st, linkToLaTeX link st "")
+  = swap (linkToLaTeX link "" st)
   where param :: String -> Maybe [Anything Char]
         param name = Map.lookup name ll
         package
@@ -2525,17 +2643,17 @@ templateProcessor st ("Haskell lib", ll)
         caption = intercalate [C '.'] unnPars
         link = location ++ [C ' '] ++ caption
 templateProcessor st ("V", ll)
-  = (st,
+  = swap  (
      wikiLinkToLaTeX
        ((C 'v') : (C ':') : (Map.findWithDefault [] "1" ll))
        st)
 templateProcessor st ("wikisource", ll)
-  = (st,
+  = swap (
      wikiLinkToLaTeX
        ((C 's') : (C ':') : (Map.findWithDefault [] "1" ll))
        st)
 templateProcessor st ("M", ll)
-  = (st,
+  = swap  (
      wikiLinkToLaTeX
        ((C 'm') : (C ':') : (Map.findWithDefault [] "1" ll))
        st)
@@ -2584,17 +2702,17 @@ templateProcessor st ("Commons", ll)
               (treeToLaTeX (Map.findWithDefault [] "2" ll) st) else
               (treeToLaTeX (Map.findWithDefault [] "1" ll) st)
 templateProcessor st ("b", ll)
-  = (st,
+  = swap  (
      wikiLinkToLaTeX
        ((C 'b') : (C ':') : (Map.findWithDefault [] "1" ll))
        st)
 templateProcessor st ("Wikiquote", ll)
-  = (st,
+  = swap  (
      wikiLinkToLaTeX
        ((C 'q') : (C ':') : (Map.findWithDefault [] "1" ll))
        st)
 templateProcessor st ("Wikisource", ll)
-  = (st,
+  = swap  (
      wikiLinkToLaTeX
        ((C 's') : (C ':') : (Map.findWithDefault [] "1" ll))
        st)
@@ -2717,16 +2835,15 @@ javakeyword ::
             [Char] -> Map String [Anything Char] -> [Char] -> Renderer String
 javakeyword xs ll j
   = if (xs `elem` keywords) then
-      state $ \ st -> ("{\\bfseries " ++ xs ++ "}", st) else
+      state $ \ st -> ("{\\bfseries \\ttshape " ++ xs ++ "}", st) else
       unknownTemplate (j ++ xs) ll
   where keywords
-          = (["private", "int", "return", "void", "new", "class",
-              "interface", "String", "null", "Object", "byte", "char", "short",
-              "long", "double", "boolean", "if", "true", "static", "public",
-              "protected", "extends", "throw", "catch", "throws", "try",
-              "abstract", "false", "else", "switch", "continue", "import",
-              "final", "break", "implements", "finally", "while", "string",
-              "float", "do", "for", "case", "default", "package", "this"])
+          = ["abstract","assert","boolean","break","byte","case","catch","char","class","const","continue","default","do"]
+           ++ ["double","else","enum","extends","final","finally","float","for","goto","if","implements","import","instanceof"]
+           ++["int","interface","long","native","new","package","private","protected","public","return","short","static"]
+           ++["strictfp","super","switch","synchronized","this","throw","throws","transient","try","void","volatile","while"]
+           ++["none","true","false","Object","String","null","identifier","access-modifiers"]
+
 
 {-DHUN| Handler for the unknown template. That is the ones that no handler was registered for DHUN-}
 
@@ -2743,13 +2860,15 @@ unknownTemplate xx ll2
            maybe_known_sf
              = do lis <- Map.lookup x tm
                   guard (not $ null lis)
-                  let (latexname : transparams) = lis
-                  guard (latexname /= "")
-                  return $
-                    do out <- mapM step_ttl transparams
-                       return $
-                         "\\" ++
-                           latexname ++ "{" ++ (intercalate "}{" (map trim out)) ++ "}"
+                  case lis of
+                    (latexname : transparams) ->
+                      do guard (latexname /= "")
+                         return $
+                          do out <- mapM step_ttl transparams
+                             return $
+                               "\\" ++
+                                 latexname ++ "{" ++ (intercalate "}{" (map trim out)) ++ "}"
+                    _ ->  Nothing
            unknown_sf
              = do uparams <- mapM step_ttl $ Map.keys ll
                   return $
@@ -2871,20 +2990,20 @@ treeToLaTeX2 ll
                put $ st2{fontStack = drop 1 (fontStack st2)}
                return $ "{\\ttfamily " ++ (trim d) ++ "}"
         
-        walkfn :: String -> [Anything Char] -> String -> Renderer String
-        walkfn prefix l postfix
+        walkfn :: [Anything Char] -> Renderer String
+        walkfn l
           = do st <- get
                put $ st{getInFootnote = True}
                d <- treeToLaTeX2 l
                st2 <- get
                put $ st2{getInFootnote = (getInFootnote st)}
-               return $ prefix ++ d ++ postfix
-        
+               makeFootNoteRef "" d "" 
+               
         nodeToLaTeX :: Anything Char -> Renderer String
         nodeToLaTeX (C c)
           = do st <- get
                case (fontStack st) of
-                   (x : _) -> if (getFont x c) == (font st) then return (chartrans c)
+                   (x : _) -> if ((getFont x c) == (font st))||(isSpaceIndent st) then return (chartrans c)
                                 else
                                 do put
                                      st{font = (getFont x c),
@@ -2900,7 +3019,21 @@ treeToLaTeX2 ll
           = return $ s >>= chartrans
           
           
-          
+        nodeToLaTeX (Environment Wikitable (TagAttr "table" m) lll) | havefontsize (Map.lookup "style" m) = 
+          do d<-nodeToLaTeX (Environment Wikitable (TagAttr "table" (Map.alter rmfontsize "style" m)) lll)
+             let size= do p<-(Map.lookup "style" m)
+                          case splitOn "font-size:" p of
+                            (_:v:[])->case splitOn "%" v of 
+                               (h:_) -> case (reads (strip " \t\n\r" h)) of
+                                         [(z, _)]-> (Just z)::(Maybe Integer)
+                                         _ -> Nothing
+                               _ -> Nothing
+                            _->Nothing
+             return (case size of
+                       Nothing -> d 
+                       Just s  ->"{\\scalefont{"++(show (mangle ((0.01::Double)*(fromIntegral s))))++"}"++d++"}")
+         where 
+          mangle x =  if x <1.0 then min 0.75 x else x
         nodeToLaTeX (Environment Tag (TagAttr "div" m) lll) | kartopred m =  mapToLaTeX [(Environment Tag (TagAttr "div" m) lll)]
 
           
@@ -2918,11 +3051,9 @@ treeToLaTeX2 ll
         nodeToLaTeX (Environment Wikitable (TagAttr t a) l)
           = do st <- get
                put $ st{getInTab = (getInTab st) + 1}
-               d <- tableToLaTeXNew (subTableCellCorrect l) (maybe False (\x->or (map ($ x) (map isInfixOf ["navbox", "infobox"]))) (Map.lookup "class" a)) 
-                      (if
-                         (Map.lookup "class" a) `elem`
-                           (map Just ["prettytable", "wikitable"])
-                         then "class=\"wikitable\"" else "") ((Map.lookup "style" a)>>= findwd) [(Environment Wikitable (TagAttr t a) l)] 
+               d <- tableToLaTeXNew (subTableCellCorrect l) False 
+                      (if ((Map.lookup "rules" a`elem` (map Just ["all"])))||
+                 (isJust ((Map.lookup "class" a) >>= \str-> if (isInfixOf "wikitable" str) || (isInfixOf "prettytable" str) then return "wikitable" else Nothing)) then "class=\"wikitable\"" else "") ((Map.lookup "style" a)>>= findwd) [(Environment Wikitable (TagAttr t a) l)] 
                st2 <- get
                put $ st2{getInTab = (getInTab st)}
                return d
@@ -2930,12 +3061,12 @@ treeToLaTeX2 ll
           = do st <- get
                if getInHeading st then return $ wikiLinkCaption l st else
                  if (isImage (shallowFlatten l)) then wikiImageToLaTeX l else
-                   return $ wikiLinkToLaTeX l st
+                   wikiLinkToLaTeX2 l
         nodeToLaTeX (Environment Link (Str s) l)
           = do st <- get
                if getInHeading st then
                  return $ linkCaption l st s (getInFootnote st) else
-                 return $ linkToLaTeX l st s
+                 linkToLaTeX2 l s
         nodeToLaTeX (Environment Link2 (Str s) l)
           = nodeToLaTeX (Environment Link (Str s) l)
         nodeToLaTeX (Environment ItemEnv (Str _) [Item _]) = return []
@@ -3049,16 +3180,16 @@ treeToLaTeX2 ll
           = do st <- get
                if getInHeading st then treeToLaTeX2 l else
                  case Map.lookup "href" d of
-                     Just g -> return $
-                                 linkToLaTeX
-                                   ((map (C)
+                     Just g -> case g of
+                                '#':_->wikiLinkToLaTeX2 (map C g)
+                                _ -> linkToLaTeX2
+                                      ((map (C)
                                        (case g of
-                                            '/' : ('/' : gx) -> "http://" ++ gx
+                                            '/' : ('/' : gx) -> "https://" ++ gx
                                             '/' : _ -> wikiUrlDataToString (urld st) g
                                             _ -> g))
                                       ++ [C ' '] ++ l)
-                                   st
-                                   ""
+                                   "" 
                      Nothing -> treeToLaTeX2 l
         nodeToLaTeX (Environment Tag (TagAttr "ol" _) l)
           = do st <- get
@@ -3128,7 +3259,7 @@ treeToLaTeX2 ll
           = walk "\\sout{" l "}"
         nodeToLaTeX (Environment Tag (TagAttr "small" _) l)
           = do st <- get
-               if getInHeading st then walk "" l "" else walk "{\\small " l "}"
+               if getInHeading st then walk "" l "" else walk "{\\smaller " l "}"
         nodeToLaTeX (Environment Tag (TagAttr "center" _) l)
           = do d <- treeToLaTeX2 (shallowEnlargeMath l)
                return $ "\n\\begin{center}\n" ++ d ++ "\n\\end{center}\n"
@@ -3145,7 +3276,7 @@ treeToLaTeX2 ll
                    Nothing -> go st l
           where go ss xx
                   = if getInFootnote ss then walk "\\^{}\\{" xx "\\}" else
-                      walkfn "\\myfootnote{" xx "}"
+                      walkfn xx
         nodeToLaTeX (Environment Tag (TagAttr "includeonly" _) l)
           = walk "" l ""
         nodeToLaTeX (Environment Tag (TagAttr "blockquote" _) l)
@@ -3157,6 +3288,8 @@ treeToLaTeX2 ll
         nodeToLaTeX (Environment Tag (TagAttr "big" _) l)
           = do st <- get
                if getInHeading st then walk "" l "" else walk "{\\large " l "}"
+        nodeToLaTeX (Environment Tag (TagAttr "div" m) l) | (havepos [Environment Tag (TagAttr "div" m) l]) = posToLaTeX l 
+        nodeToLaTeX (Environment Tag (TagAttr "div" a) _) | (isInfixOf "display:none" (Map.findWithDefault [] "style" a)) = return ""
         nodeToLaTeX (Environment Tag (TagAttr "div" a) l)
           = let co
                   = case Map.lookup "style" a of
@@ -3210,8 +3343,23 @@ treeToLaTeX2 ll
                 ((Map.findWithDefault [] "class" a) `elem`
                    ["noprint", "latitude", "longitude", "elevation"])
                   || ((Map.findWithDefault [] "id" a) `elem` ["coordinates"])
-                then return "" else walk "" l ""
-              else walk "" l ""
+                then return "" else col (Map.findWithDefault [] "style" a)
+              else col (Map.findWithDefault [] "style" a)
+         where 
+           col x = case splitOn "border-left-color" x of
+                     (_:xs:_) -> case splitOn ":" xs of
+                                 (_:ys:_) -> case splitOn ";" ys of
+                                                    (hs:_) -> case colinfo ( (strip " \n\r\t" hs)) of
+                                                                (True,colname,colo)-> walk ("\\definecolor{" ++ colname ++ "}{rgb}" ++ colo ++"\\colorbox{"++colname++"}{") l "}"  
+                                                                (False,colname,_)-> walk ("\\colorbox{"++colname++"}{") l "}"
+                                                    _ ->walk "" l ""     
+
+                                 _-> walk "" l ""
+                     _-> walk "" l ""
+ 
+         
+         
+         
         nodeToLaTeX (Environment Tag (TagAttr "br" _) _)
           = do st <- get
                return $
@@ -3265,7 +3413,11 @@ treeToLaTeX2 ll
                  z <- treeToLaTeX2 l
                  put st
                  if (all (\ x -> x `elem` "\r\n\t ") z) then return "" else
-                   do d <- treeToLaTeX2 (breakLines3 linewidth l)
+                   do sst<-get
+                      put sst {isSpaceIndent=True}  
+                      d <- treeToLaTeX2 (breakLines3 linewidth l)
+                      ssst<-get
+                      put ssst {isSpaceIndent=False}  
                       return $ (preput st) ++ "\\TemplateSpaceIndent{" ++ d ++ "}\n"
           where preput i = if (getInCode i)||((getInTab i) > 0) then "" else "\\\\\n\n"
         nodeToLaTeX (Environment Math _ l) = return $ mathToLatex l
@@ -3288,7 +3440,7 @@ treeToLaTeX2 ll
                              g <- Tools.unhex z
                              return g
                           of
-                            Just x -> nodeToLaTeX (C (chr ( fromIntegral  x)))
+                            Just x -> if (x==(65279::Integer)) then return "\\raisebox{2.0ex}{ }" else nodeToLaTeX (C (chr ( fromIntegral  x)))
                             Nothing -> return (("&#" ++ s ++ ";") >>= chartrans)
                   (x : _) -> nodeToLaTeX (C ( chr  (fst  x)))
         nodeToLaTeX (Environment Gallery _ l)
@@ -3311,6 +3463,41 @@ treeToLaTeX2 ll
         nodeToLaTeX (Environment Label (Str s) _)
           = return $ "\\label{" ++ s ++ "}"
         nodeToLaTeX _ = return []
+
+
+havefontsize::Maybe String->Bool
+havefontsize Nothing = False
+havefontsize (Just x) = isInfixOf "font-size:" x
+
+rmfontsize::Maybe String->Maybe String
+rmfontsize Nothing = Nothing
+rmfontsize (Just x) = Just (intercalate ";" (filter (\y->not (isInfixOf "font-size:" y)) (splitOn ";" x)))
+
+havepos::[Anything Char]->Bool
+havepos ((Environment Tag (TagAttr "div" a) l):xs) = checkattrstyle || checkattrclass || (havepos xs) || (havepos l)
+  where 
+    checkattrstyle = case Map.lookup "style" a of
+                             Just x -> (isInfixOf "position:" x) 
+                             Nothing -> False
+    checkattrclass = case Map.lookup "class" a of
+                             Just x -> (isInfixOf "timeline" x) || (isInfixOf "mw-ext-score" x)
+                             Nothing -> False
+havepos ((Environment _ _ l):xs) = (havepos l) || (havepos xs)
+havepos (_:xs) = (havepos xs)
+havepos [] = False
+
+
+tabletoodeep::[Anything Char]->Bool
+tabletoodeep l = tdeep l 1
+
+tdeep::[Anything Char]->Int->Bool
+tdeep ((Environment _ (TagAttr "table" _) _):_) 0 = True 
+tdeep ((Environment _ (TagAttr "table" _) l):xs) n = (tdeep l (n-1))|| (tdeep xs n)
+tdeep ((Environment _ _ l):xs) n = (tdeep l n) || (tdeep xs n)
+tdeep (_:xs) n = (tdeep xs n)
+tdeep [] _ = False
+
+
 
 {-DHUN| Unicode escaping for latex strings DHUN-}
 

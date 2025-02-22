@@ -2,7 +2,6 @@
 
 
 %replacemnt for pslatex
-\usepackage{mathptmx}
 \usepackage[scaled=.92]{helvet}
 \usepackage{courier}
 
@@ -28,13 +27,17 @@
 \usepackage{amssymb}
 \usepackage{amsfonts}
 
+%replacemnt for pslatex
+\usepackage{mathptmx}
+
+% für Symbole
 \usepackage{pifont}
 \usepackage{marvosym}
 \let\Cross\undefined 
 \usepackage{fourier-orns}  % disable this line for tex4ht   % für weitere Logos, z.B. \danger
 
 % für Grafik-Einbindung
-\usepackage[pdftex]{graphicx}
+\usepackage{graphicx}
 \usepackage{wasysym}
 \let\Square\undefined 
 
@@ -54,4 +57,7 @@
 \usepackage{amsthm}
 \usepackage{index}
 \usepackage{scalefnt}
+\usepackage{relsize}
+\usepackage{array}
+\renewcommand\RSsmallest{1pt}
 \makeindex

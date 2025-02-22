@@ -45,8 +45,12 @@ data MyState = MyState{getImages :: [String], getJ :: Int,
                        currentUrl :: String, fndict :: Map String [Anything Char],
                        tablist :: [[String]], tabmap :: Map Int (Map Int Double),
                        fontStack :: [FontStyle], font :: Font, langu :: Maybe String,
-                       forms :: Map String Int, lastChar :: Char, lastFontChanged :: Bool, getInCaption :: Bool, vector:: Bool, htmlTables :: [String], latexTabs :: Bool, htmlMaps::[String]}
+                       forms :: Map String Int, lastChar :: Char, lastFontChanged :: Bool, getCaptionLevel :: Integer, vector:: Bool, htmlTables :: [String], latexTabs :: Bool, htmlMaps::[String], htmlColors::Map String String, isSpaceIndent :: Bool, footnoteMap::Map Integer String, footnoteNumber::Integer}
              deriving (Show, Eq, Serialize, Generic)
+
+
+getInCaption :: MyState->Bool
+getInCaption st = (getCaptionLevel st)>0
 
 {-DHUN| Renderer is the State monad using MyState as mutable state DHUN-}
 
@@ -66,7 +70,7 @@ initialState
             fontStack =
               [FontStyle{stylebase = Normal, bold = False, italic = False}],
             font = ComputerModernRoman, langu = Nothing, forms = Map.empty,
-            lastChar = ' ', lastFontChanged = False, getInCaption=False, vector=False,htmlTables=[], latexTabs=False,htmlMaps=[]}
+            lastChar = ' ', lastFontChanged = False, getCaptionLevel=0, vector=False,htmlTables=[], latexTabs=False,htmlMaps=[],htmlColors=Map.empty,isSpaceIndent=False, footnoteMap=Map.empty, footnoteNumber=1}
 
 {-DHUN| represents an URL to a wiki (not to a page thereof), which is not a sister project of wikipedia, so not wikibooks wikisource, etc. DHUN-}
 

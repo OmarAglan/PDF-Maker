@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings, ScopedTypeVariables #-}
 {-DHUN| Server module, allows mediawiki2latex to run as webserver DHUN-}
 module Server where
+import Control.Monad
 import Data.Text (Text)
 import Happstack.Server hiding (body)
 import qualified Text.Blaze.Html5 as H
@@ -12,7 +13,6 @@ import Data.ByteString.UTF8
 import Data.ByteString.Lazy
        hiding (pack, reverse, takeWhile, dropWhile)
 import Control.Concurrent
-import Control.Monad.State
 import ImperativeState hiding (name)
 import Hex
 import Data.Map.Strict
@@ -56,7 +56,7 @@ pageFrame input
                 H.table H.! A.style "padding:20px" $
                   do H.tr $
                        infoBox "MediaWiki to LaTeX"
-                         "MediaWiki to LaTeX converts Wiki pages to LaTeX and PDF. It works with any website running MediaWiki, especially Wikipedia and Wikibooks. MediaWiki to LaTeX is purely written in the purely functional language Haskell. It was mainly devolved by Dirk H\252nniger. The source code is freely available under the terms of the GNU General Public License. Binary releases for the most common operating systems are available for download. The Debian package is maintained by Georges Khaznadar."
+                         "MediaWiki to LaTeX converts Wiki pages to LaTeX and PDF. It works with any website running MediaWiki, especially Wikipedia and Wikibooks. MediaWiki to LaTeX is purely written in the purely functional language Haskell. It was mainly developed by Dirk H\252nniger. The source code is freely available under the terms of the GNU General Public License. Binary releases for the most common operating systems are available for download. The Debian package is maintained by Georges Khaznadar."
                      H.tr $
                        infoBox "Contact" $
                          do mytext "Dirk H\252nniger"
@@ -117,7 +117,7 @@ pageFrame input
                               " and running at on your own hardware instead of using this server."
 
 infoBox :: String -> H.Html -> H.Html
-infoBox heading content
+infoBox heading ccontent
   = H.td $
       H.div H.! A.style "padding:10px" $
         H.div H.!
@@ -126,7 +126,7 @@ infoBox heading content
           $
           do H.div H.! A.style "font-size:30" $ H.b (mytext heading)
              H.br
-             H.div H.! A.style "text-align:jusitfy" $ content
+             H.div H.! A.style "text-align:jusitfy" $ ccontent
 
 data ProgressInfo = ProgressInfo{progress :: Double,
                                  filename :: Maybe String, startTime :: Double, barValue :: Double,
@@ -151,13 +151,13 @@ serve p
 {-DHUN| template for the start page of the server DHUN-}
 
 template :: Text -> H.Html -> Response
-template title body
+template ttitle bbody
   = toResponse $
       H.docTypeHtml $
         do H.head $
              do H.meta H.! A.charset "utf-8"
-                H.title (H.toHtml title)
-           H.body $ do body
+                H.title (H.toHtml ttitle)
+           H.body $ do bbody
 
 {-DHUN| takes an url to a wiki article and a filename for the temporary file to be created and return a shell command to run mediawiki2latex to compile a pdf document from the given url and write it to the given temporary filename DHUN-}
 
@@ -419,7 +419,7 @@ formPage m s
                                                         "odt" else "pdf")
                            hClose handle >> removeFile name
                            act <- mainAction
-                                    FullConfig{selfTest = Nothing, headers = Nothing,
+                                    FullConfig{ltxproc=Nothing,selfTest = Nothing, headers = Nothing,
                                                resolution = 300, outputFilename = name,
                                                inputUrl = (toString (toStrict msg)),
                                                runMode =

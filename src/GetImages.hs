@@ -129,7 +129,7 @@ doImage1 dir theWikiUrl img
   = do return (getImagePage1 dir theWikiUrl (fst img, theName))
   where theName
           = case dropWhile (/= ':') (takeWhile (/= '|') (snd img)) of
-                (_ : xs) -> replace2 (replace2 xs "%27" "'") "%" "%25"
+                (_ : xs) -> replace2 xs "%27" "'"
                 _ -> []
 
 
@@ -142,7 +142,7 @@ doImage2 dir theWikiUrl img
            _ -> return Nothing
  where theName
           = case dropWhile (/= ':') (takeWhile (/= '|') (snd img)) of
-                (_ : xs) -> replace2 (replace2 xs "%27" "'") "%" "%25"
+                (_ : xs) -> replace2 xs "%27" "'"
                 _ -> []
 
 
@@ -254,11 +254,11 @@ mymake dir s n = do text <-Tools.readFile (dir </>("curloutput"++s++"."++(show n
             
 getImages1 ::
           String -> [String] -> WikiUrl -> ImperativeMonad ([ImageCredits])
-getImages1 dir images theWikiUrl
+getImages1 dir imagess theWikiUrl
   = do liftIO $
          do let ddir = dir
             let thetheWikiUrl = theWikiUrl
-            let iimages = ((zip [1 ..] (map (premap2 . premap) images)))
+            let iimages = ((zip [1 ..] (map (premap2 . premap) imagess)))
             helper<-(mapM (doImage1 ddir thetheWikiUrl) iimages)
             let l = map first helper
             let hosts = concat (repeat (map hof (parses theWikiUrl)))
@@ -279,7 +279,7 @@ getImages1 dir images theWikiUrl
             myprint (" curl run (3/3)")
             fullmake dir "3"
             authorList<-mapM fun2 imgdescfiles
-            mapM (getCredits dir) (zip (makautlist authorList) (zip images (zip ([1..(length images)]) imgdescurls)))
+            mapM (getCredits dir) (zip (makautlist authorList) (zip imagess (zip ([1..(length imagess)]) imgdescurls)))
   where
     premap2 x = case splitOn "?lang=" x of
                  (y:_) -> y
@@ -301,12 +301,20 @@ getImages1 dir images theWikiUrl
     getCredit ::String->String->Int->IO ImageCredits 
     getCredit auth path j = do aut<- getTheAuthor path j
                                lic<- getTheLicense path j
-                               return (ImageCredits {theAltAuthors=auth ,theAuthor=aut, theLicense =lic, theDescUrl="",imageNumber=0,wikiFilename=""})
+                               return (ImageCredits {theAltAuthors=auth ,theAuthor=if j==(length (parses theWikiUrl)) then commonize aut else aut, theLicense =lic, theDescUrl="",imageNumber=0,wikiFilename=""})
     getTheAuthor path j = do t<-BStr.readFile (path++"."++(show j)++".html.author")                           
                              let r=(S.decode t) ::Either String [Anything Char]
                              case r of 
                                Right rr -> return (killTree rr)
                                _-> return []
+    commonize ((Environment Tag (TagAttr "a" m) l):xs) = (Environment Tag (TagAttr "a" (Map.alter altfun "href" m)) (commonize l)):(commonize xs)
+    commonize ((Environment t s l):xs) =  (Environment t s (commonize l)):(commonize xs)
+    commonize (x:xs)=x:(commonize xs)
+    commonize [] = []
+    altfun Nothing = Nothing
+    altfun (Just ('/':'w':'i':'k':'i':'/':xs))= Just ("https://commons.wikimedia.org/wiki/" ++ xs)
+    altfun (Just ('/':'w':'/':xs))= Just ("https://commons.wikimedia.org/w/" ++ xs)
+    altfun (Just x) = Just x 
     getTheLicense path j =do t<-BStr.readFile (path++"."++(show j)++".html.license")                           
                              let r=(S.decode t) ::Either String [Anything Char]
                              case r of 

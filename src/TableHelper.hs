@@ -97,11 +97,11 @@ columnWidths a = w
               do ww <- standardColumnWitdh a
                  return [x * f | x <- map (fromMaybe ww) l]
 
-{-DHUN| part of the correction calculation for the space between columns inside a table. Takes the number of columns as first input parameter returns a scaling factor DHUN-}
+{-DHUN| part of the correction calculation for the space between columns inside a table. Takes the number of columns as first input parameter returns a scaling factor. Scalefactor must not be 1.0 or higher to avoid stack overflow error by infinite loop in LaTeXRenderer, therefore limiting it to 34 columns per table DHUN-}
 
 scalefactor :: (Fractional a, Ord a) => a -> a
-scalefactor n | n <= 10 = 12.8 * (n) / 448.0
-scalefactor _ = 12.8 * (11.0) / 448.0
+scalefactor n | n <= 34 = 12.8 * (n) / 448.0
+scalefactor _ = 12.8 * (34.0) / 448.0
 
 {-DHUN| part of the correction calculation for the space between columns inside a table. Takes the number of columns as first input parameter returns a scaling factor DHUN-}
 
@@ -115,18 +115,23 @@ tableEnvironment :: Float -> String
 tableEnvironment 1.0 = "longtable"
 tableEnvironment _ = "tabular"
 
-innerTableSpecifier :: [Float] -> String -> String
-innerTableSpecifier (f : xs) t
-  = ">{\\RaggedRight}p{" ++
+innerTableSpecifier :: Int ->[Float] -> String -> String
+innerTableSpecifier 1 (f : xs) t
+  = "p{" ++
       (printf "%0.5f" f) ++
-        "\\linewidth}" ++ t ++ (innerTableSpecifier xs t)
-innerTableSpecifier [] _ = []
+        "\\linewidth}" ++ t ++ (innerTableSpecifier 1 xs t)
+innerTableSpecifier i (f : xs) t
+  = "p{\\dhuncolwidth{" ++
+      (printf "%0.5f" f) ++
+        "}}" ++ t ++ (innerTableSpecifier i xs t)
+
+innerTableSpecifier _ [] _ = []
 
 {-DHUN| Returns the table header which represents the width of the columns of a table in units of the line width.  It takes a list of width as second parameter. It is understood that necessary correction for the width to compensate for the space needed by separations of columns have already been applied. The is the first boolean parameter is true rules will be drawn in the table, otherwise they won't. See also documentation of the wdth3 function in the module LatexRenderer.  DHUN-}
 
-tableSpecifier :: Bool -> [Float] -> String
-tableSpecifier True f = '|' : (innerTableSpecifier f "|")
-tableSpecifier False f = (innerTableSpecifier f "")
+tableSpecifier :: Int -> Bool -> [Float] -> String
+tableSpecifier i True f = '|' : (innerTableSpecifier i f "|")
+tableSpecifier i False f = (innerTableSpecifier i f "")
 
 {-DHUN| Takes the multirowmap as first input parameter. See documentation on the function multiRowDictChangeStart in this module for details on the multirowmap. It returns true if there are currently no multirow cells active in the given multirowdict DHUN-}
 
@@ -221,14 +226,14 @@ columnMultiplicityForCounting = (fromMaybe 1) . columnMultiplicity
 {-DHUN| return the symbol for the start of a multicolumn cell in latex. The first parameter is the parse result of the inner part of the column separator of header column separator, that corresponds to the attributes of the th or td html elements. It takes the list of the final widths of all columns of the table as second parameter. It takes to the column index of the current column as third parameter. The fourth parameter is a boolean if it is true rules will be drawn in the table otherwise they won't. The fifth parameter is the table state. That is the mutable state that exists during rendering of a table. DHUN-}
 
 multiColumnStartSymbol ::
-                       [Anything Char] -> [Float] -> Int -> Bool -> TableState -> String
-multiColumnStartSymbol l f i t st
+                       [Anything Char] -> Int -> [Float] -> Int -> Bool -> TableState -> String
+multiColumnStartSymbol l j f i t st
   = fromMaybe "" $
       do n <- columnMultiplicity l
          return $ "\\multicolumn{" ++ (show n) ++ "}{" ++ (spec n) ++ "}{"
   where spec mm
           = case activeColumn st of
-                Nothing -> tableSpecifier t (mylist mm)
+                Nothing -> tableSpecifier j t (mylist mm)
                 _ -> "l"
         mylist nn
           = [min 1.0
@@ -343,14 +348,14 @@ multiRowDictChange i d l
 
 {-DHUN| returns the latex symbol for the start of a multirow cell. That is a cell spanning multiple rows. The second parameter is activeColumn. This is an integer wrapped in the maybe monad. If it is has the value Just then the row is to be renderer in a special mode. This mode is needed to determine the width of the columns. In this special mode no line break occur and width of the paper is infinite, so that the width of the of each column is its respective natural width. So there is no limit on the width of the column. If the value is Nothing this means that the table is typeset in normal mode and the width is to be limited. The first parameter is the inner parse result of the row separator containing information on whether or not the cell is multirow DHUN-}
 
-multiRowStartSymbol :: [Anything Char] -> Maybe Int -> String
-multiRowStartSymbol l m
+multiRowStartSymbol :: [Anything Char] -> Maybe Int -> MyState -> String
+multiRowStartSymbol l m st
   = fromMaybe "" $
       do n <- rowMultiplicity l
          return $
-           "\\multirow{" ++
+           if n==1 then "" else ("\\multirow{" ++
              (show n) ++
-               "}{" ++ (if isJust m then "*" else "\\linewidth") ++ "}{"
+               "}{" ++ (if isJust m then "*" else (printf "%0.5f" (getF st)) ++ "\\linewidth") ++ "}")++"{"
 
 {-DHUN| a symbol to be added at the end of header cell in order to make its content bold. The only boolean parameter is use to indicate whether the cell currently under consideration is a header cell. Otherwise the empty string is returned.  DHUN-}
 
@@ -365,6 +370,7 @@ headstartsym = "{\\bfseries "
 
 {-DHUN| the symbol to be inserted into the latex document, for the end of a row in a table. The first boolean parameter is should be true if the current table is not nested in an other one. The second boolean parameter should be true if the column was the last column of the header of the table. The header of the table is repeated by latex each time page wrapping inside the table occurs. See also documentation of the longtable latex package DHUN-}
 
-rowendsymb :: Bool -> Bool -> String
-rowendsymb True True = "\\endhead "
-rowendsymb _ _ = "\\\\"
+rowendsymb :: Bool -> Bool -> Map Int (Int, Int) -> String
+rowendsymb _ _ m = "\\\\"++(if isEmpty then "" else "*")
+  where
+    isEmpty = (sum (map fst (Map.elems m)))==0

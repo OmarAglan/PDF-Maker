@@ -1,6 +1,7 @@
 {-# LANGUAGE DefaultSignatures, DeriveAnyClass #-}
 {-DHUN| module to download the wiki source text form the wiki website DHUN-}
 module Load where
+import Control.Monad
 import ImperativeState
 import Tools
 import Hex
@@ -226,9 +227,9 @@ qBookIncludeAction cfg wurl text
                   _ -> (loadPlain d wurl Nothing)  >>= (return . Just)
 
 makeUrl :: String -> String -> String -> [Char]
-makeUrl lang theFam thePage
+makeUrl llang theFam thePage
   = (unify . exportURL)
-      (if isInfixOf "commons" lang then
+      (if isInfixOf "commons" llang then
          (URL{url_path = "~daniel/WikiSense/Contributors.php",
               url_params =
                 [("wikifam", "commons.wikimedia.org"), ("page", thePage),
@@ -241,7 +242,7 @@ makeUrl lang theFam thePage
          else
          (URL{url_path = "~daniel/WikiSense/Contributors.php",
               url_params =
-                [("wikilang", lang), ("wikifam", theFam), ("page", thePage),
+                [("wikilang", llang), ("wikifam", theFam), ("page", thePage),
                  ("since", ""), ("until", ""), ("grouped", "on"),
                  ("hideanons", "on"), ("max", "100000"), ("format", "html")],
               url_type =
@@ -312,7 +313,7 @@ makeBody m u = concat (map go (sort (toList m)))
         fun xs = xs
         go (_, v)
           = (show (edits v)) ++
-              "& \\myhref{" ++
+              "& \\mycontributorhref{" ++
                 (concat
                    (map chartransforlink (exportURL (u{url_path = (fun (href v))}))))
                   ++ "}{" ++ (concat (map chartrans (name v))) ++ "}\\\\\n"
@@ -338,15 +339,15 @@ makeContributors uu
                    Just u -> exportURL u
                    _ -> makeUrl3 (lemma (fullUrl st)) (hostname (fullUrl st))
        yy <- liftIO $ geturl theUrl
-       let lang
+       let llang
              = case (deepGet2 "html" (parseHtml yy)) of
                    ((Environment Tag (TagAttr _ m) _) : []) -> Map.lookup "lang" m
                    _ -> Nothing
        return
-         (((makeHeader (fullUrl st) lang) ++
+         (((makeHeader (fullUrl st) llang) ++
              (makeBody (myaudict) (url (fullUrl st))) ++
                "\\end{longtable}\n" ++ "\\pagebreak\n"),
-          (makeHeaderHTML (fullUrl st) lang) ++
+          (makeHeaderHTML (fullUrl st) llang) ++
             (makeBodyHTML (myaudict) (url (fullUrl st))) ++ "</table>")
 
 parseUrl :: String -> ImperativeMonad FullWikiUrl
@@ -477,7 +478,7 @@ loadHTML st
              Right _ -> put newst
              _ -> return ()
          x <- liftIO (geturl2 (exportURL (url fu)))
-         return . C.decode . unpack $ x
+         return ("\n\ndhunparserurl " ++ (lemma (fullUrl st)) ++ "\n\n"++((C.decode . unpack) x))
 
 
 

@@ -1,5 +1,5 @@
 Name:           mediawiki2latex
-Version:        8.7
+Version:        8.26
 License:        GPL
 License-File:   LICENSE
 Author:         Dirk Hünniger <dirk.hunniger@googlemail.com>
@@ -115,7 +115,6 @@ Executable mediawiki2latex
     network-uri,
     bytestring,
     process,
-    http-conduit,
     http-client,
     http-types,
     bytestring >= 0.10,
@@ -147,6 +146,7 @@ Executable mediawiki2latex
     cereal,
     network >= 2.3.0.13,
     tagsoup,
+    http-client-tls,
     word8
 
   Other-Modules:

@@ -17,6 +17,8 @@ import Compiler (runCompile, runTreeToLaTeX, runNewTree)
 import Tools (replace2)
 import Load
 import GetImages
+import Data.Serialize as S (decode)
+import qualified Data.ByteString as B
 {-DHUN| Data structure to repesent a single option on the command line. DHUN-}
 
 data Flag = Verbose
@@ -180,7 +182,7 @@ options
        "paper size, on of A4,A5,B5,letter,legal,executive",
      Option ['m'] [mediawiki] (NoArg MediaWiki)
        "use MediaWiki to expand templates",
-     Option ['h'] [html] (NoArg Main.HTML)
+     Option ['h'] [Main.html] (NoArg Main.HTML)
        "use MediaWiki generated html as input (default)",
      Option ['e'] [tableslatex] (NoArg Main.LaTeXTables)
        "use LaTeX to generate tables",
@@ -221,7 +223,7 @@ header = "Usage: mediawiki2latex [OPTION...]"
 
 versionHeader :: String
 versionHeader
-  = "mediawiki2latex version 8.7\n" ++ (usageInfo header options)
+  = "mediawiki2latex version 8.26\n" ++ (usageInfo header options)
 
 {-DHUN| print the version string of mediawiki2latex. Takes the output of the compilerOpts function as input. Prints the version string if no options were given or the version command was given does noting otherwise DHUN-}
 
@@ -343,7 +345,7 @@ checkOpts cwd o
                                          return
                                            FullConfig{ImperativeState.headers = Nothing,
                                                       resolution = 300, outputFilename = "",
-                                                      inputUrl = "", runMode = ImperativeState.HTML ImperativeState.No,
+                                                      inputUrl = "", runMode = ImperativeState.HTML ImperativeState.No,ltxproc=Nothing,
                                                       paper = "A4", vector = False,
                                                       ImperativeState.copy = Nothing, mainPath = "",
                                                       server = Nothing, selfTest = Just (s, e),
@@ -362,7 +364,7 @@ checkOpts cwd o
                                                            mainPath = "", server = Just z,
                                                            outputType = PlainPDF,
                                                            selfTest = Nothing, compile = Nothing,
-                                                           convert=Nothing, noparent=False, imgctrburl=Nothing,ctrb=Nothing,latexTables=False}
+                                                           convert=Nothing, noparent=False, imgctrburl=Nothing,ctrb=Nothing,latexTables=False, ltxproc=Nothing}
                                   _ -> Left (NotIntegerError serverOption)
                     _ -> do hexVal <- atMostOne hexPredicate hexen o
                             case hexVal of
@@ -441,7 +443,7 @@ checkOpts cwd o
                                                         if zipVal then ZipArchive else
                                                           if epubVal then EPubFile else
                                                             if odtVal then OdtFile else PlainPDF,
-                                                      compile = Nothing, convert=Nothing, noparent=noparentVal, imgctrburl=Nothing,ctrb=Nothing, latexTables=if latexTablesVal then True else (if chromiumTablesVal then False else True)})
+                                                      compile = Nothing, ltxproc=Nothing ,convert=Nothing, noparent=noparentVal, imgctrburl=Nothing,ctrb=Nothing, latexTables=if latexTablesVal then True else (if chromiumTablesVal then False else True)})
 
 {-DHUN| main entry point of mediawiki2latex DHUN-}
 
@@ -472,11 +474,19 @@ main
                                             _ ->  case (imgctrburl x) of
                                                    Just (cufile,host) -> do _<-(runStateT (runExceptT (runCtrbUrl cufile host)) stz)
                                                                             return ()
-                                                   _-> do print x
-                                                          (xx, _) <- (runStateT (runExceptT (All.all x))
-                                                                      stz {vectorr=(vector x)})
-                                                          case xx of
-                                                            Left n -> print n
-                                                            _ -> return ()
+                                                   
+                                                   _-> case (ltxproc x) of 
+                                                         Just ltxpath -> do t <- liftIO $ B.readFile (ltxpath </> "config")
+                                                                            ltxconf<-case S.decode t of 
+                                                                                      Right ltxcfg->return (ltxcfg ::LatexConfig)
+                                                                                      _-> error "could not read state ltxconf"
+                                                                            _<-runLaTeXCallback ltxconf ltxpath
+                                                                            return ()
+                                                         _-> do print x
+                                                                (xx, _) <- (runStateT (runExceptT (All.all x))
+                                                                            stz {vectorr=(vector x)})
+                                                                case xx of
+                                                                  Left n -> print n
+                                                                  _ -> return ()
            Left y -> print y
        return ()

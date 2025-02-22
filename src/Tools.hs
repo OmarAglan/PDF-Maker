@@ -7,6 +7,11 @@ import Control.Monad
 import System.IO
 import System.IO.Strict
 import Data.Time.Clock.POSIX
+
+strip :: (Eq a) => [a] -> [a] -> [a]
+strip l = reverse . (dropWhile isBad) . reverse . dropWhile isBad
+  where isBad x = x `elem` l
+
 {-DHUN| Pads a string with spaces. Adds space charactes to the beginning of a string until it has got a desired length. The first paramter is the desired length. The second paramter is the original string. The return value is the padded string. DHUN-}
 
 

@@ -4,7 +4,7 @@ import Data.Maybe
 import Control.Monad
 import Data.Array
 import Data.Char
-import System.Cmd
+import System.Process
 
 
 
@@ -14,8 +14,9 @@ findfont [] f= GnuUnifont
 
 
 getArray::Font->IO (Array Int Bool)
-getArray f = do _<-system ("python font.py "++(getttf f)++"> "++name)
-                text<-readFile filename
+getArray f = do print name
+                _<-system ("python3 /home/dirk/Downloads/usr/bin/names.py "++(show f)++"> "++name)
+                text<-readFile name
                 return $ array (0,(length text) -1) (zip [0..((length text) -1)] (zt text))
   where
     zt::[Char]->[Bool]
@@ -39,7 +40,7 @@ stylebasenext Smallcaps = Normal
 
 styles =(itbf Normal)++(itbf Mono)++(itbf Smallcaps)
 
-myfun as i fs = [f|(f,b)<-zip fonts (map (!i) as),b&&(fs==getstyle f)]
+myfun as i fs = [f|(f,b)<-zip fonts (map (! i) as),b&&(fs==getstyle f)]
 
 getdata::[Array Int Bool]->Int-> [([Font],FontStyle)]
 getdata as i = zip (map (myfun as i) styles) styles
@@ -63,7 +64,7 @@ getFont chars fontStyle i = if (mi<=i) && (i<=mx) then getf else def
     swp = map swap ch
     ff sty = (lookup sty swp)
     gg sty = (ff sty) `mplus` (ff sty{italic= not (italic sty)}) `mplus` (ff sty{bold= not (bold sty)}) `mplus` (ff sty{italic= not (italic sty),bold= not (bold sty)})
-    hh sty = (gg sty) `mplus` (gg sty{stylebase= stylebasenext .stylebase $sty}) `mplus` (gg sty{stylebase= stylebasenext.stylebasenext.stylebase$ sty})
+    hh sty = (gg sty) `mplus` (gg sty{stylebase= stylebasenext .stylebase $ sty}) `mplus` (gg sty{stylebase= stylebasenext.stylebasenext.stylebase$ sty})
     getf = fromMaybe def ((hh fontStyle)>>=return.(findfont fonts) )
 
-module Main (main) where
+

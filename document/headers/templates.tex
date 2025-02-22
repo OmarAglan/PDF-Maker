@@ -112,7 +112,18 @@ This code example uses #1 Syntax
 
 
 \newcommand{\LaTeXNullTemplate}[1]{}
+\newcommand{\LaTeXAppendixTemplate}[1]{\appendix}
+
+
+
 \newcommand{\LaTeXEquals}[1]{=}
+
+\newcommand{\LaTeXJavaEnumTemplate}[1]{\textbf{enum}}
+\newcommand{\LaTeXJavaStringTemplate}[1]{\texttt{\textbf{#1}}}
+\newcommand{\LaTeXAccentTemplate}[1]{'}
+
+
+\newcommand{\LaTeXJavaEBNFTemplate}[1]{Extended Backus-Naur Form}
 
 \newcommand{\LatexSymbol}[1]{\LaTeX}
 
@@ -153,16 +164,9 @@ This code example uses #1 Syntax
 \newcommand{\LaTeXDoubleBoxOpenTemplate}[2]{
 
 \definecolor{shadecolor}{gray}{0.9}\begin{myshaded}{\bfseries #1} \\
-#2
 \end{myshaded}
 
-}
-
-\newcommand{\LaTeXDoubleBoxOpenTemplate}[2]{
-
-\definecolor{shadecolor}{gray}{0.9}\begin{myshaded}{\bfseries #1} \\
 #2
-\end{myshaded}
 
 }
 
@@ -360,6 +364,10 @@ This code example uses #1 Syntax
 
 \newcommand{\LaTeXGCCTakeTemplate}[1]{
 \LaTeXDoubleBoxTemplate{Take home:}{#1}
+}
+
+\newcommand{\LaTeXProblemTemplate}[1]{
+\LaTeXDoubleBoxTemplate{Problem:}{#1}
 }
 
 \newcommand{\LaTeXEditorNote}[1]{\LaTeXDoubleBoxTemplate{Editor's note}{#1}}
@@ -581,6 +589,8 @@ the "#1" module
 \newcommand{\HaskellExampleTemplate}[2]{\LaTeXDoubleBoxTemplate{Example: #1}{#2}}
 
 \newcommand{\LaTeXexampleTemplate}[1]{\LaTeXDoubleBoxTemplate{Example:}{#1}}
+\newcommand{\LaTeXNoteTemplate}[1]{\LaTeXDoubleBoxTemplate{Note:}{#1}}
+\newcommand{\LaTeXConsoleTemplate}[1]{\LaTeXDoubleBoxTemplate{Console:}{#1}}
 
 \newcommand{\LaTeXPTPBoxTemplate}[1]{\LaTeXDoubleBoxTemplate{Points to ponder:}{#1}}
 

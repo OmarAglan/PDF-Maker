@@ -5,7 +5,7 @@ module UrlAnalyse
         FullWikiUrl, hostname, url, alternatives, lemma, wikiUrl, geturl,
         parses, geturl2, fullWikiUrlZero, getExpandedPage, getpage2, getBookpage)
        where
-import Network.HTTP.Conduit
+import Network.HTTP.Client
 import Data.ByteString.Lazy.Internal
 import Network.URL as URL
 import Control.Monad
@@ -25,7 +25,7 @@ import qualified Network.HTTP.Types as T
 import qualified Network.HTTP.Types.Version as V
 import Data.Serialize
 import GHC.Generics
-
+import Network.HTTP.Client.TLS
 deriving instance Read URL.URL
 deriving instance Read URL.Host
 deriving instance Read URL.Protocol
@@ -112,14 +112,14 @@ geturl u
                         []))
                     req0) {method=method req0}
           manager <- newManager tlsManagerSettings
-          res <- (httpLbs req manager)`X.catch` statusExceptionHandler
+          res <- (httpLbs req manager)`X.catch` (statusExceptionHandler req)
           return ((unpackChars (responseBody res))))
       fun
  where  
         fun :: ErrorCall -> IO String
         fun _ = return ""
-        statusExceptionHandler ::  SomeException -> IO (Network.HTTP.Conduit.Response L.ByteString)
-        statusExceptionHandler _ = (return (I.Response {responseBody=L.empty,responseStatus=T.Status {T.statusCode=200,T.statusMessage=BStr.empty}, responseVersion=V.http09,responseHeaders=[],responseCookieJar=I.CJ [],I.responseClose'=I.ResponseClose (return ())}))
+        statusExceptionHandler ::  I.Request->SomeException -> IO (Network.HTTP.Client.Response L.ByteString)
+        statusExceptionHandler r _ = (return (I.Response {I.responseOriginalRequest=r, responseBody=L.empty,responseStatus=T.Status {T.statusCode=200,T.statusMessage=BStr.empty}, responseVersion=V.http09,responseHeaders=[],responseCookieJar=I.CJ [],I.responseClose'=I.ResponseClose (return ())}))
  
 
 {-DHUN| Loads the data stored under an URL from the web. Result will be a ByteString. Mainly useful for loading HTML for further processing, as well as binary image files. DHUN-}
@@ -136,14 +136,14 @@ geturl2 u
                         []))
                     req0) {method=method req0}
           manager <- newManager tlsManagerSettings
-          res <- (httpLbs req manager)`X.catch` statusExceptionHandler
+          res <- (httpLbs req manager)`X.catch` (statusExceptionHandler req)
           return  (L.toStrict (responseBody res)))
       fun
  where  
         fun :: ErrorCall -> IO BStr.ByteString
         fun _ = return (BStr.pack [])
-        statusExceptionHandler ::  SomeException -> IO (Network.HTTP.Conduit.Response L.ByteString)
-        statusExceptionHandler _ = (return (I.Response {responseBody=L.empty,responseStatus=T.Status {T.statusCode=200,T.statusMessage=BStr.empty}, responseVersion=V.http09,responseHeaders=[],responseCookieJar=I.CJ [],I.responseClose'=I.ResponseClose (return ())}))
+        statusExceptionHandler ::  I.Request->SomeException -> IO (Network.HTTP.Client.Response L.ByteString)
+        statusExceptionHandler r _ = (return (I.Response {I.responseOriginalRequest=r,responseBody=L.empty,responseStatus=T.Status {T.statusCode=200,T.statusMessage=BStr.empty}, responseVersion=V.http09,responseHeaders=[],responseCookieJar=I.CJ [],I.responseClose'=I.ResponseClose (return ())}))
 
 {-DHUN| loads the wiki sourcecode strored under a lemma in on a server running mediawiki. The first parameter is the lemma to look up. The second parameter is the URL to the special:export page on the server. The return value is the source wikitext DHUN-}
 
@@ -161,14 +161,14 @@ geturl4 s u
                         [("mw-input-pages",s),("curonly","1"),("wpExportTemplates","0"),("wpDownload","1")]))
                     req0) 
           manager <- newManager tlsManagerSettings
-          res <- (httpLbs req manager)`X.catch` statusExceptionHandler
+          res <- (httpLbs req manager)`X.catch` (statusExceptionHandler req)
           return ((unpackChars (responseBody res))))
       fun
  where  
         fun :: ErrorCall -> IO String
         fun _ = return ""
-        statusExceptionHandler ::  SomeException -> IO (Network.HTTP.Conduit.Response L.ByteString)
-        statusExceptionHandler _ = (return (I.Response {responseBody=L.empty,responseStatus=T.Status {T.statusCode=200,T.statusMessage=BStr.empty}, responseVersion=V.http09,responseHeaders=[],responseCookieJar=I.CJ [],I.responseClose'=I.ResponseClose (return ())}))
+        statusExceptionHandler ::  I.Request->SomeException -> IO (Network.HTTP.Client.Response L.ByteString)
+        statusExceptionHandler r _ = (return (I.Response {I.responseOriginalRequest=r,responseBody=L.empty,responseStatus=T.Status {T.statusCode=200,T.statusMessage=BStr.empty}, responseVersion=V.http09,responseHeaders=[],responseCookieJar=I.CJ [],I.responseClose'=I.ResponseClose (return ())}))
 
 
 {-DHUN| loads the wikisource of a wiki article from a server running mediawiki, with all mediawiki templates expanded into wiki text. The first parameter is the url to special:expand templates page on the server. The second parameter is the wikitext source including the mediawiki templates to be expanded. The third parameter is the name of the lemma on the server. DHUN-}
@@ -186,14 +186,14 @@ geturl3 u d s
                          ("generate_xml", "0"), ("contexttitle", s)]))
                     req0
           manager <- newManager tlsManagerSettings
-          res <- (httpLbs req manager) `X.catch` statusExceptionHandler
+          res <- (httpLbs req manager) `X.catch` (statusExceptionHandler req)
           return ((unpackChars (responseBody res))))
       fun
  where  
         fun :: ErrorCall -> IO String
         fun _ = return ""
-        statusExceptionHandler ::  SomeException -> IO (Network.HTTP.Conduit.Response L.ByteString)
-        statusExceptionHandler _ = (return (I.Response {responseBody=L.empty,responseStatus=T.Status {T.statusCode=200,T.statusMessage=BStr.empty}, responseVersion=V.http09,responseHeaders=[],responseCookieJar=I.CJ [],I.responseClose'=I.ResponseClose (return ())}))
+        statusExceptionHandler ::  I.Request->SomeException -> IO (Network.HTTP.Client.Response L.ByteString)
+        statusExceptionHandler r _ = (return (I.Response {I.responseOriginalRequest=r,responseBody=L.empty,responseStatus=T.Status {T.statusCode=200,T.statusMessage=BStr.empty}, responseVersion=V.http09,responseHeaders=[],responseCookieJar=I.CJ [],I.responseClose'=I.ResponseClose (return ())}))
  
  
 {-DHUN| helper function to get the actual wiki source as string out of a part of and xml tree returned by the xml parser. Only used for the function getTextContent DHUN-}

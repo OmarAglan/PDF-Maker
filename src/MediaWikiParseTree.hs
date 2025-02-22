@@ -53,7 +53,7 @@ data EnvType = Wikilink
              | Label
              | Parameter
              | NumHtml
-             deriving (Show, Eq, Serialize, Generic, NFData)
+             deriving (Show, Eq, Serialize, Generic, NFData, Read)
 
 {-DHUN| A type representing a node in a the parse tree. Open and Close represent opening and closing bracket. They will be replace by environments (look at 'Environment' in this data structure) before the parse tree is processed further. The C represents a single character. S stands for a String. Tab is a special elements used like the tabulator character for line breaking purposes. Quad is similar to that. The Item... data construction are for processing itemization enumerations and so on and well be replace be environments before further processing DHUN-}
 
@@ -66,15 +66,15 @@ data Anything a = Environment EnvType StartData [Anything a]
                 | ItemStart Char
                 | Quad
                 | Tab
-                deriving (Show, Eq, Serialize, Generic, NFData)
+                deriving (Show, Eq, Serialize, Generic, NFData, Read)
 
 {-DHUN| represents the result of a parser for the begin of an environment. A parser for an opening HTML tag is an example. TagAttr means tag with attributes. And is thus a string for the element and a map from string to string for it attributes. Str is a String. And Attr is key value pair and used for attribute in tables.  DHUN-}
 
 data StartData = Str [Char]
                | TagAttr String (Map String String)
                | Attr (String, String)
-               deriving (Show, Eq, Serialize, Generic, NFData)
+               deriving (Show, Eq, Serialize, Generic, NFData, Read)
                
 data ImageCredits = ImageCredits {theAuthor::[ Anything Char], theLicense ::[Anything Char], theDescUrl::String, wikiFilename :: String, imageNumber :: Int, theAltAuthors::String}
-  deriving (Show, Eq, Serialize, Generic, NFData)
+  deriving (Show, Eq, Serialize, Generic, NFData, Read)
 

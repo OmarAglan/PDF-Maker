@@ -1,6 +1,7 @@
 {-# LANGUAGE DefaultSignatures, DeriveAnyClass #-}
 {-DHUN| module to compile mediawiki page to latex documents. This module is called from the All module.|DHUN-}
 module Compiler where
+import Control.Monad
 import ImperativeState
 import MyState
 import MediaWikiParseTree
@@ -28,8 +29,12 @@ runCompile dir cfg
        p <- return $ case runMode cfg of
                        (HTML _) -> minparsers
                        _ -> parsers
+       ppt <- return $ case runMode cfg of
+                         (HTML _) -> printPrepareTree2 
+                         _ -> printPrepareTree
+                       
        st <- lift get
-       cr <- return (printPrepareTree (not (latexTable st)) (parseit p t))
+       cr <- return (ppt (not (latexTable st)) (parseit p t))
        liftIO $ B.writeFile (dir </> "output") (encode cr)
 
 
@@ -72,8 +77,8 @@ compile ::
                 String ->
                   Maybe String ->
                     Map.Map String Int -> Bool -> Maybe String->Bool->ImperativeMonad CompileResult
-compile theRunMode text templates tabs mytitle mylanguage formulas
-  b lang latexTabels
+compile theRunMode text templates tabs mytitle mylanguage fformulas
+  b llang latexTabels
   = do st <- get
        case theRunMode of
            StandardTemplates No -> return
@@ -82,33 +87,33 @@ compile theRunMode text templates tabs mytitle mylanguage formulas
                                        (hostname . fullUrl $ st)
                                        templates
                                        tabs
-                                       formulas (vectorr st) lang latexTabels)
+                                       fformulas (vectorr st) llang latexTabels)
            UserTemplateFile No _ -> return
                                       (run b mylanguage mytitle (parseit parsers text)
                                         (parseit parsers text)
                                         (hostname . fullUrl $ st)
                                         templates
                                         tabs
-                                        formulas (vectorr st) lang latexTabels)
-           HTML No  -> do --liftIO (Tools.writeFile "/home/dirk/dhudhu" (show (printPrepareTree (not latexTabels) (parseit minparsers text))))
+                                        fformulas (vectorr st) llang latexTabels)
+           HTML No  -> do --liftIO (Tools.writeFile "/home/dirk/dhudhu" (show (printPrepareTree2 (not latexTabels) (parseit minparsers text))))
                           return
                            (run b mylanguage mytitle
-                            (printPrepareTree (not latexTabels) (parseit minparsers text))
-                            (printPrepareTree (not latexTabels) (parseit minparsers text))
+                            (printPrepareTree2 (not latexTabels) (parseit minparsers text))
+                            (printPrepareTree2 (not latexTabels) (parseit minparsers text))
                             (hostname . fullUrl $ st)
                              templates
                              tabs
-                             formulas (vectorr st) lang latexTabels)
+                             fformulas (vectorr st) llang latexTabels)
            ExpandedTemplates No -> do return
                                        (run b mylanguage mytitle (parseit parsers text)
                                         (parseit parsers text)
                                         (hostname . fullUrl $ st)
                                         templates
                                         tabs
-                                        formulas (vectorr st)lang latexTabels)
+                                        fformulas (vectorr st) llang latexTabels)
            _ -> do case loadacu st of 
-                       Right pt -> return  (run b mylanguage mytitle pt pt  (hostname . fullUrl $ st)   templates tabs  formulas (vectorr st) lang latexTabels)
-                       Left pt -> (runcheap b mylanguage mytitle pt  (hostname . fullUrl $ st)   templates tabs  formulas theRunMode latexTabels)
+                       Right pt -> return  (run b mylanguage mytitle pt pt  (hostname . fullUrl $ st)   templates tabs  fformulas (vectorr st) llang latexTabels)
+                       Left pt -> (runcheap b mylanguage mytitle pt  (hostname . fullUrl $ st)   templates tabs  fformulas theRunMode latexTabels)
 
 {-DHUN| pathname of the temporary directory of the compiler |DHUN-}
 
@@ -167,12 +172,6 @@ postproctabmap m = Map.map f m
               (Map.mapKeys (\ k -> k - 1)
                  (Map.map (\ x -> (x + 12.333748 - (minimum (Map.elems m1)))) m1))
 
-{-DHUN| datatype for the results of a compulation process. The field images contains the strings enlclose in double square brackes in the wiki used for image inclusion. The field body contains the body of the latex document compiled form the wiki documents. The field tablelist contains a list of lists of  bodies of latex document containing the latex source for a single column. Those can be compiled with the propper headers and footers on arbitrary huge paper to determine the maximum reasonable width for a each column in each table of the document which is need for automatic calculation of column widths for the document. The field gallery numbers contain the image numbers of images include in the wiki source inside of galleries. These got a smaller dimension in cm in the final pdf document and can thus be dithers to a small width in pixels. The field title contains the title of the document if a template defining the title was part of the parse wiki source |DHUN-}
-
-data CompileResult = CompileResult{images :: [String],
-                                   body :: String, tablelist :: [[String]],
-                                   galleryNumbers :: [Integer], title :: String, html :: String, theHtmlTabs::[String], theHtmlMaps::[String]}
-                   deriving Show
 
 {-DHUN| the first parameter is the parse tree created by get parse of the document currently being processed. the second parameter is the URL under which the document was downloaded. the third parameter is the netloc describing the wiki this page belongs to. The fourth parameter is a mapping file defined by the user for the mapping of mediawiki templates to latex commands. the fifth parameter is a possible parse tree created by precious run the the should be added before the begging of the newly created parse tree. This function writes out all results to temporary files that will be further processed by compiler.py DHUN-}
 
@@ -185,13 +184,13 @@ run ::
               String ->
                 String -> [[ByteString]] -> Map.Map String Int -> Bool ->Maybe String->Bool->CompileResult
 run bb mylanguage mytitle parsetree parsetree2 netloc tmpl
-  someTables formulas vec lang latexTabels
+  someTables fformulas vec llang latexTabels
   = CompileResult{images = img, body = bdy, tablelist = theTables,
                   galleryNumbers = gals, title = tit,
-                  html = if bb then trda3 else [],theHtmlTabs =htmlTabs, theHtmlMaps=htmlMs}
+                  html = if bb then trda3 else [],theHtmlTabs =htmlTabs, theHtmlMaps=htmlMs, theHtmlColors= htmlCols}
   where alldata2 g u
           = (treeToLaTeX3 ((snd . newtree $ g))
-               initialState{urld = analyseNetloc netloc}{langu=lang, tabmap = u,
+               initialState{urld = analyseNetloc netloc}{langu=llang, tabmap = u,
                                                          templateMap =
                                                            getUserTemplateMap
                                                              (read tmpl :: [[String]])}{urls =
@@ -201,8 +200,8 @@ run bb mylanguage mytitle parsetree parsetree2 netloc tmpl
                                                                                               newtree
                                                                                             $ g, latexTabs=latexTabels})
         alldata3 g u
-          = (treeToHtml3 formulas mylanguage mytitle ((snd . newtree $ g))
-               initialState{urld = analyseNetloc netloc}{langu=lang,MyState.vector=vec, tabmap = u,
+          = (treeToHtml3 fformulas mylanguage mytitle ((snd . newtree $ g))
+               initialState{urld = analyseNetloc netloc}{langu=llang,MyState.vector=vec, tabmap = u,
                                                          templateMap =
                                                            getUserTemplateMap
                                                              (read tmpl :: [[String]])}{urls =
@@ -221,6 +220,8 @@ run bb mylanguage mytitle parsetree parsetree2 netloc tmpl
         gals = getGalleryNumbers trst
         tit = getTitle trst
         htmlTabs = htmlTables trst
+        htmlCols = htmlColors trst
+        
         htmlMs = htmlMaps trst
         
         fun :: ByteString -> Double
@@ -263,7 +264,7 @@ runcheap _ _ _ input netloc tmpl
         
        return CompileResult{images = img, body = bdy, tablelist = theTables,
                   galleryNumbers = gals, title = tit,
-                  html = [],theHtmlTabs=htmlTables trst, theHtmlMaps=htmlMaps trst}
+                  html = [],theHtmlTabs=htmlTables trst, theHtmlMaps=htmlMaps trst, theHtmlColors=htmlColors trst}
   where 
         labelit g= foldM labelloc initialUrlState g
         labelloc us fn = do _ <- liftIO $ B.writeFile (fn </> "intus") (encode us)

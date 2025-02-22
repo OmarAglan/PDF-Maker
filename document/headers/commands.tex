@@ -72,6 +72,15 @@
 {}
 
 
+
+
+\newcommand{\mycontributorhref}[2]
+{{#2}\protect\footnote{    \begin{minipage}{\fnwidth} \ttfamily \url{#1}  \end{minipage}}} 
+
+
+\newcommand{\mylofref}[2]
+{#1\protect\footnote{\mychapterbabel {$\text{}$} \ref{#2} \mypagebabel {$\text{}$} \pageref{#2}}}
+
 \newcommand{\mytabhref}[2]
 {{#2}\protect\footnote{\ttfamily \url{#1} }}
 %{\textsc{#2}}
@@ -85,10 +94,17 @@
 \addtolength{\fnwidth}{-10mm}
 
 \newcommand{\myhref}[2]
-{{#2}\protect\footnote{    \begin{minipage}{\fnwidth} \ttfamily \url{#1}  \end{minipage}}} 
+{\protect\footnotetext[#1]{    \begin{minipage}{\fnwidth} \ttfamily \url{#2}  \end{minipage}}} 
 
 \newcommand{\mylref}[2]
-{{#2}\protect\footnote{\mychapterbabel {$\text{}$} \ref{#1} \mypagebabel {$\text{}$} \pageref{#1}}}
+{\protect\footnotetext[#1]{\mychapterbabel {$\text{}$} \ref{#2} \mypagebabel {$\text{}$} \pageref{#2}}}
+
+
+\newcommand{\myfnref}[2]
+{#2\\^{}\{\text{#1} \}}
+\newcommand{\myref}[2]
+{\protect\footnotetext[#1]{#2}}
+
 
 \newcommand{\myfnsref}[2]
 {\text{#2} \^{}\{\text{#1} \}}
@@ -231,7 +247,21 @@
 \newcommand{\Tau}{\mathrm{T}}
 \newcommand{\Chi}{\mathrm{X}}
 
-
+\ExplSyntaxOn
+\newcommand\dhuncolwidth[1]
+ {
+   \dim_eval:n 
+     {
+       \fp_eval:n
+         {
+           ( 
+              \dim_to_decimal:n{\linewidth}
+            - \dim_to_decimal:n{2\tabcolsep+\arrayrulewidth}
+           )*#1
+         } pt
+      }
+  }        
+\ExplSyntaxOff
 
 
 

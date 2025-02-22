@@ -11,6 +11,7 @@ import Data.List
 {-DHUN| A type to for errors that might be thrown during the imperative calculation DHUN-}
 import Data.Serialize
 import GHC.Generics
+import qualified Data.Map as Map
 data MyError = DownloadError String String
              | OtherError String
              | WikiUrlParseError String
@@ -96,8 +97,20 @@ data ImperativeState = ImperativeState{audict ::
                                        fullUrl :: FullWikiUrl, tmpPath :: String,
                                        counter :: MVar Int, loadacu :: Either [FilePath] [Anything Char], vectorr::Bool, noparentis::Bool,latexTable :: Bool, finishedLemmas::[String]}
 
+{-DHUN| datatype for the results of a compulation process. The field images contains the strings enlclose in double square brackes in the wiki used for image inclusion. The field body contains the body of the latex document compiled form the wiki documents. The field tablelist contains a list of lists of  bodies of latex document containing the latex source for a single column. Those can be compiled with the propper headers and footers on arbitrary huge paper to determine the maximum reasonable width for a each column in each table of the document which is need for automatic calculation of column widths for the document. The field gallery numbers contain the image numbers of images include in the wiki source inside of galleries. These got a smaller dimension in cm in the final pdf document and can thus be dithers to a small width in pixels. The field title contains the title of the document if a template defining the title was part of the parse wiki source |DHUN-}
+
+data CompileResult = CompileResult{images :: [String],
+                                   body :: String, tablelist :: [[String]],
+                                   galleryNumbers :: [Integer], title :: String, html :: String, theHtmlTabs::[String], theHtmlMaps::[String], theHtmlColors::Map.Map String String}
+                deriving (Show, Serialize, Generic, Read)
 
 
+data LatexConfig = LatexConfig{figures :: [ImageCredits],
+                               ltitle :: String, fullConfig :: FullConfig, content :: String,
+                               lhostname :: String, theResult :: CompileResult, onlyTables :: Bool,
+                               lang :: Maybe String, theTempDir :: String,
+                               formulas :: [(String, Int)], figHTML :: String, theHtmlTables :: [String], theHtmlMapes::[String],theHtmlColours::Map String String}
+                deriving (Show, Serialize , Read, Generic)
 
 type ImperativeMonad = ExceptT MyError (StateT ImperativeState IO)
 
@@ -129,7 +142,7 @@ data FullConfig = FullConfig{headers :: Maybe String,
                              vector :: Bool, copy :: Maybe String, mainPath :: String,
                              server :: Maybe Int, outputType :: OutputType,
                              selfTest :: Maybe (Integer, Integer), compile :: Maybe String,
-                             convert:: Maybe (ConvertState), noparent::Bool, imgctrburl :: Maybe (String,String),ctrb :: Maybe String, latexTables :: Bool}
+                             convert:: Maybe (ConvertState), noparent::Bool, ltxproc :: Maybe String, imgctrburl :: Maybe (String,String),ctrb :: Maybe String, latexTables :: Bool}
                 deriving (Show, Read, Serialize, Generic)
 
 fullconfigbase :: FullConfig
@@ -138,4 +151,4 @@ fullconfigbase
                outputFilename = "", inputUrl = "", runMode = HTML No, paper = "A4",
                vector = False, copy = Nothing, mainPath = "", server = Nothing,
                outputType = PlainPDF, selfTest = Nothing, compile = Nothing,
-               convert =Nothing, noparent=False, imgctrburl=Nothing,ctrb=Nothing, latexTables = False}
+               convert =Nothing, noparent=False, imgctrburl=Nothing,ctrb=Nothing, latexTables = False, ltxproc =Nothing}

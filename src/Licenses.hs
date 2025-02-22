@@ -68,6 +68,8 @@ minlicenses
       "CC-BY-SA-3.0"),
      ("https://creativecommons.org/licenses/by-sa/3.0/deed.de",
       "CC-BY-SA-3.0"),
+     ("https://creativecommons.org/licenses/by-sa/3.0/at/deed.de",
+      "CC-BY-SA-3.0"),
      ("http://creativecommons.org/licenses/by-sa/3.0/cr/deed.en",
       "CC-BY-SA-3.0"),
      ("http://creativecommons.org/licenses/by-sa/3.0/de/deed.en",
@@ -166,6 +168,8 @@ minlicenses
       "CC-BY-SA-2.0"),
      ("http://creativecommons.org/licenses/by-sa/2.0/uk/deed.en",
       "CC-BY-SA-2.0"),
+     ("https://creativecommons.org/licenses/by-sa/2.0/de/deed.en",
+      "CC-BY-SA-2.0"),      
      ("http://creativecommons.org/licenses/sa/1.0/", "CC-SA-1.0"),
      ("https://creativecommons.org/licenses/by/1.0/deed.en", "CC-BY-1.0"),
      ("http://creativecommons.org/publicdomain/zero/1.0/deed.en", "PD"),
@@ -177,5 +181,7 @@ minlicenses
      ("https://en.wikipedia.org/wiki/de:Gemeinfreiheit","PD"),
      ("https://creativecommons.org/licenses/by-sa/4.0/deed.de","CC-BY-SA-4.0"),
      ("https://creativecommons.org/licenses/by-sa/4.0/deed.en","CC-BY-SA-4.0"),
-     ("https://creativecommons.org/licenses/by/4.0/deed.de","CC-BY-4.0")
+     ("https://creativecommons.org/licenses/by/4.0/deed.de","CC-BY-4.0"),
+     ("https://creativecommons.org/licenses/by/4.0/deed.en","CC-BY-4.0"),
+     ("http://artlibre.org/lal/de","LFK")
      ]

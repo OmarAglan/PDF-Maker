@@ -9,12 +9,16 @@ import UrlAnalyse hiding (url)
 import Load
 import Compiler
 import GetImages
-import Control.Monad.State hiding (join)
+import Control.Monad
+import Control.Monad.State
 import Tools
+import MyState (getInTab, footnoteMap)
 import Data.ByteString
-       hiding (take, reverse, dropWhile, takeWhile, drop, map, concat,
+       hiding (take, reverse, dropWhile, takeWhile, drop, map,
                elem, zip, intercalate)
+import qualified Data.ByteString.Lazy as LZ (toStrict)
 import System.Directory
+import qualified Data.Map as LMap
 import System.IO.Temp
 import WikiHelper
 import System.Info
@@ -38,10 +42,9 @@ import System.FilePath
 import Control.Concurrent.MVar ()
 import Data.Hashable
 import Hex
-import Data.IORef
+import Control.Concurrent
 import System.IO
 import Codec.Archive.Zip
-import Data.ByteString.Lazy (toStrict)
 import System.Exit
 import System.IO.Error
 import HtmlParser (parseHtml)
@@ -50,6 +53,8 @@ import Data.Word8 (isSpace)
 import Network.URI
 import LatexRenderer
 import Text.Read (readMaybe)
+import qualified Data.Serialize as S (encode)
+import GHC.Conc
 {-DHUN| takes a filename as input parameter and returns the so called normalized extension for it. This is and extension classifying the type of the file while used in this program. Its not necessarily the real extension of the filename. For example .jpeg images will be converted to jpg and so on. DHUN-}
 
 getExtension :: String -> String
@@ -75,22 +80,22 @@ getConvert p
 makeTitle :: CompileResult -> FullWikiUrl -> [Char]
 makeTitle result fu = theTitle
   where theTitle
-          = if (Compiler.title result) == "" then pub ++ tit else
-              pub ++ (Compiler.title result)
+          = if (title result) == "" then pub ++ tit else
+              pub ++ (title result)
         pub
           = "\\publishers{" ++
-              (concat (map chartrans (UrlAnalyse.hostname fu))) ++ "}\n"
+              (Data.List.concat (map chartrans (UrlAnalyse.hostname fu))) ++ "}\n"
         tit
           = "\\title{" ++
-              (concat (map (chartrans) ((removePrintVersion (lemma fu))))) ++
+              (Data.List.concat (map (chartrans) ((removePrintVersion (lemma fu))))) ++
                 "}\n"
 
 makeTitle2 :: CompileResult -> FullWikiUrl -> [Char]
 makeTitle2 result fu = theTitle
   where theTitle
-          = if (Compiler.title result) == "" then tit else
-              (Compiler.title result)
-        tit = (concat (map (chartrans) ((removePrintVersion (lemma fu)))))
+          = if (title result) == "" then tit else
+              (title result)
+        tit = (Data.List.concat (map (chartrans) ((removePrintVersion (lemma fu)))))
 
 {-DHUN| returns the prefix of the path where addional needed software resides depending on the operation system DHUN-}
 
@@ -170,6 +175,7 @@ runFileMods extbase p filenamebase extension theResolution gals imgNumber
                return ()
         postprocjpg fn
           = do _ <- system ((getConvert p) ++ "-verbose " ++ fn ++ " " ++ fn)
+               _ <- system ("exiftool -all=  -overwrite_original " ++ fn)
                dither fn
                return ()
         background fn
@@ -265,17 +271,26 @@ writeFiles2 tmpdir pathname forms = mapM_ go forms
                  (pathname ++ (Prelude.last (splitOn "/" x)))
                  filecontent
 
-data LatexConfig = LatexConfig{figures :: [ImageCredits],
-                               title :: String, fullConfig :: FullConfig, content :: String,
-                               hostname :: String, theResult :: CompileResult, onlyTables :: Bool,
-                               lang :: Maybe String, theTempDir :: String,
-                               formulas :: [(String, Int)], figHTML :: String, theHtmlTables :: [String], theHtmlMapes::[String]}
 
 runLaTeX :: LatexConfig -> ImperativeMonad ByteString
 runLaTeX config
-  = liftIO
-      (withTempDirectory  "" "MediaWiki2LaTeX-tmp"
-         (runLaTeXCallback config))
+  = liftIO(
+     do home<-getHomeDirectory
+        (withTempDirectory  home "MediaWiki2LaTeX-tmp"
+         (runLaTeXCallback config)))
+
+runLaTeXIOAction :: LatexConfig -> String -> IO ByteString
+runLaTeXIOAction config subpath
+ =   do home<-getHomeDirectory
+        (withTempDirectory  home ("MediaWiki2LaTeX-"++subpath++"-tmp")
+           (\p->do     Data.ByteString.writeFile (p </> "config") (S.encode config)      
+                       _<-system ("mediawiki2latex -x " ++
+                                      (Hex.hex (show (fullconfigbase{ltxproc = Just p}))))
+                       te <- Control.Exception.catch (Tools.readFile (p </> "document/main" </> "main.txt"))
+                              catchFun
+                       case splitOn "\n" te of
+                             (x : xs) -> return (pack (encode (intercalate "," (map (strip "pt\r,\f") (x:xs)))))
+                             _ -> return (pack (encode ""))))
 
 runLaTeXCallback :: LatexConfig -> FilePath -> IO ByteString
 runLaTeXCallback config pathname
@@ -295,6 +310,8 @@ runLaTeXCallback config pathname
             return ()
        Tools.writeFile (pathname ++ "/document/main/main.tex")
          (content config)
+       Tools.writeFile (pathname ++ "/document/headers/htmlcolors.tex")
+          (LMap.foldrWithKey (\k v s-> s++"\\xdefinecolor{"++k++"}{rgb}"++v++"\n") "" (theHtmlColours config))
        Tools.writeFile (pathname ++ "/document/index.html")
          ((html (theResult config)) ++
             "<h2>List of Figures</h2>" ++ (figHTML config))
@@ -305,9 +322,9 @@ runLaTeXCallback config pathname
             "\\newcommand{\\SVGExtension}{pdf}" else
             "\\newcommand{\\SVGExtension}{png}")
        Tools.writeFile (pathname ++ "/document/headers/title.tex")
-         (All.title config)
+         (ltitle config)
        Tools.writeFile (pathname ++ "/document/headers/babel.tex")
-         (makeBabel (lang config) (All.hostname config))
+         (makeBabel (lang config) (lhostname config))
        Tools.writeFile (pathname ++ "/document/headers/paper.tex")
          ("\\KOMAoption{paper}{" ++ (paper (fullConfig config)) ++ "}")
        if (onlyTables config) then return () else
@@ -320,8 +337,8 @@ runLaTeXCallback config pathname
             All.writeFiles2 (theTempDir config)
               (pathname ++ "/document/formulas/")
               (formulas config)
-       _<-mapM (\(n,c)-> (Tools.writeFile (pathname ++ "/document/table"++(show n)++".html") c)>>system ("chromium --no-pdf-header-footer --headless --print-to-pdf=\""++pathname++"/document/table"++(show n)++".pdf\" "++pathname++"/document/table"++(show n)++".html >/dev/null 2>/dev/null")>>system ("pdfcrop --margins '0 0 0 0' "++pathname++"/document/table"++(show n)++".pdf "++pathname++"/document/table"++(show n)++".pdf >/dev/null 2>/dev/null") )  (zip ([1..]::[Integer]) (theHtmlTables config))
-       _<-mapM (\(n,c)-> (Tools.writeFile (pathname ++ "/document/map"++(show n)++".html") c)>>system ("chromium --no-pdf-header-footer --headless --print-to-pdf=\""++pathname++"/document/map"++(show n)++".pdf\" "++pathname++"/document/map"++(show n)++".html >/dev/null 2>/dev/null")>>system ("pdfcrop --margins '0 0 0 0' "++pathname++"/document/map"++(show n)++".pdf "++pathname++"/document/map"++(show n)++".pdf >/dev/null 2>/dev/null") )  (zip ([1..]::[Integer]) (theHtmlMapes config))
+       _<-mapM (\(n,c)-> (Tools.writeFile (pathname ++ "/document/table"++(show n)++".html") c)>>system ("chromium --no-sandbox --no-pdf-header-footer --headless --print-to-pdf=\""++pathname++"/document/table"++(show n)++".pdf\" "++pathname++"/document/table"++(show n)++".html >/dev/null 2>/dev/null")>>system ("pdfcrop --margins '0 0 0 0' "++pathname++"/document/table"++(show n)++".pdf "++pathname++"/document/table"++(show n)++".pdf >/dev/null 2>/dev/null") )  (zip ([1..]::[Integer]) (theHtmlTables config))
+       _<-mapM (\(n,c)-> (Tools.writeFile (pathname ++ "/document/map"++(show n)++".html") c)>>system ("chromium --no-sandbox --no-pdf-header-footer --headless --print-to-pdf=\""++pathname++"/document/map"++(show n)++".pdf\" "++pathname++"/document/map"++(show n)++".html >/dev/null 2>/dev/null")>>system ("pdfcrop --margins '0 0 0 0' "++pathname++"/document/map"++(show n)++".pdf "++pathname++"/document/map"++(show n)++".pdf >/dev/null 2>/dev/null") )  (zip ([1..]::[Integer]) (theHtmlMapes config))
        
        cwd <- getCurrentDirectory
        setCurrentDirectory (pathname ++ "/document/main")
@@ -339,17 +356,17 @@ runLaTeXCallback config pathname
               (\ r ->
                  do if (onlyTables config) then return () else
                       myprint (" generating PDF file. LaTeX run " ++ (show r) ++ " of 4")
-                    mysystem
+                    system
                       ((if os == "linux" then "buf_size=10000000 lualatex" else
                           (mainPath (fullConfig config)) ++
                             "..\\miktex\\miktex\\bin\\xelatex.exe")
-                         ++ " --interaction=batchmode main.tex"))
+                         ++ " --interaction=batchmode main.tex > /dev/null"))
        _ <- ((if onlyTables config then return () else
-                mysystem
+                system
                   ((if os == "linux" then "makeindex" else
                       (mainPath (fullConfig config)) ++
                         "..\\miktex\\miktex\\bin\\makeindex.exe")
-                     ++ " main")
+                     ++ " main > /dev/null")
                   >> return ()))
        _ <- forM
               ((if
@@ -360,13 +377,13 @@ runLaTeXCallback config pathname
               (\ r ->
                  do if (onlyTables config) then return () else
                       myprint (" generating PDF file. LaTeX run " ++ (show r) ++ " of 4")
-                    mysystem
+                    system
                       ((if os == "linux" then "buf_size=10000000 lualatex" else
                           (mainPath (fullConfig config)) ++
                             "..\\miktex\\miktex\\bin\\xelatex.exe")
-                         ++ " --interaction=batchmode main.tex"))
+                         ++ " --interaction=batchmode main.tex > /dev/null"))
        result <- if (onlyTables config) then
-                   do _ <- do mysystem
+                   do _ <- do system
                                ((if os == "linux" then "" else
                                  (mainPath (fullConfig config)) ++ "..\\pdftotext\\")
                                   ++ "pdftotext main.pdf main.txt")
@@ -382,14 +399,14 @@ runLaTeXCallback config pathname
                                         a <- addFilesToArchive [OptRecursive] emptyArchive
                                                ["document"]
                                         Data.ByteString.writeFile "main.zip"
-                                          (toStrict (fromArchive a))
+                                          (LZ.toStrict (fromArchive a))
                                         Data.ByteString.readFile "main.zip"
                        OdtFile -> do setCurrentDirectory ".."
-                                     mysystem "libreoffice --headless --convert-to odt index.html"
-                                     mysystem "libreoffice --headless --convert-to html:HTML:EmbedImages index.odt"
-                                     mysystem "libreoffice --headless --convert-to odt index.html"
+                                     _<-system "libreoffice --headless --convert-to odt index.html"
+                                     _<-system "libreoffice --headless --convert-to html:HTML:EmbedImages index.odt"
+                                     _<-system "libreoffice --headless --convert-to odt index.html"
                                      Data.ByteString.readFile "index.odt"
-                       EPubFile -> do mysystem "ebook-convert ../index.html .epub"
+                       EPubFile -> do _<-system "ebook-convert ../index.html .epub"
                                       Data.ByteString.readFile "index.epub"
        setCurrentDirectory cwd
        return result
@@ -442,12 +459,10 @@ getLang u
 catchFun :: IOException -> IO String
 catchFun _ = return ""
 
-strip :: (Eq a) => [a] -> [a] -> [a]
-strip l = reverse . (dropWhile isBad) . reverse . dropWhile isBad
-  where isBad x = x `elem` l
+
 
 latexPostamble :: String
-latexPostamble = "\n\\end{longtable}\n\\pagebreak"
+latexPostamble = "\n\\end{longtable}\n"
 
 
 
@@ -455,17 +470,21 @@ latexPostamble = "\n\\end{longtable}\n\\pagebreak"
 toLaTeX::[Anything Char]->String
 toLaTeX zz = fst (treeToLaTeX3 zz initialState)
 
-
+makeImgAuthorsList::[ImageCredits]-> ([String],String)
+makeImgAuthorsList l = let (aut,st)= (runState (mapM treeToLaTeX2 (map theAuthor l)) initialState{MyState.getInTab=1}) in (aut,intercalate "\n" (Map.elems (footnoteMap st)))
+  
+  
 makeImgList :: [ImageCredits] -> ImperativeMonad String
 makeImgList contrib
-  = do let z = concat
-                 (map go (zip ([1 ..] :: [Integer]) contrib) )
-       return ((toString latexPreamble) ++ z ++ (latexPostamble))
-  where go (i, crb)
+  = do let z = Data.List.concat
+                 (map go (zip3 ([1 ..] :: [Integer]) contrib authors) )
+       return ((toString latexPreamble) ++ z ++ (latexPostamble)++footnotes++"\\pagebreak")
+  where (authors,footnotes)= makeImgAuthorsList contrib
+        go (i, crb, aut)
           = "\\href{" ++
               (replace2
                  (replace2
-                    (concat (map chartransforlink ( (theDescUrl crb))))
+                    (Data.List.concat (map chartransforlink ( (theDescUrl crb))))
                     "//"
                     "/")
                  "https:/"
@@ -473,7 +492,7 @@ makeImgList contrib
                 ++
                 "}{" ++
                   (show i) ++
-                    "}& " ++ (toLaTeX(theAuthor crb)) ++ "&" ++ (toLaTeX (theLicense crb)) ++ "\\\\ \\hline \n"
+                    "}& " ++ aut ++ "&" ++ (toLaTeX (theLicense crb)) ++ "\\\\ \\hline \n"
                     
 
 toHtml::[Anything Char]->String
@@ -482,7 +501,7 @@ toHtml l = fst (treeToHtml3 (fromList []) Nothing "" l initialState)
 
 makeImgListHTML :: [ImageCredits] -> ImperativeMonad String
 makeImgListHTML imgs
-  = do let z = concat (map go imgs)
+  = do let z = Data.List.concat (map go imgs)
        return
          ("<table rules=\"all\"><tr><td>Number</td><td>Contributors</td><td>License</td></tr>"
             ++ z ++ "</table>")
@@ -502,7 +521,7 @@ makeformulas ::
                String -> [Anything Char] -> ImperativeMonad [(String, Int)]
 makeformulas p tempdir ll
   = do x <- allinfo
-       return $ concat x
+       return $ Data.List.concat x
   where allinfo :: ImperativeMonad [[(String, Int)]]
         allinfo = mapM processNode ll
         
@@ -514,9 +533,9 @@ makeformulas p tempdir ll
                              ("\\documentclass{article}\n\\usepackage{color}\n\\input{./defaultcolors}\n\\usepackage{amsfonts}\n\\usepackage{amsmath}\n\\usepackage{amssymb}\n\\begin{document}\n\\thispagestyle{empty}\n$"
                                 ++ (mathTransform l) ++ "$\n\\end{document}")
                            Static.writeFiles tempdir headerFiles
-                           mysystem ("latex2png " ++ (tempdir </> (myname ++ ".tex")))
+                           _<-system ("latex2png " ++ (tempdir </> (myname ++ ".tex")))
                            sz <- mysize (tempdir </> (myname ++ ".png"))
-                           mysystem
+                           _<-system
                              ("latex2png -c -d 1200 " ++ (tempdir </> (((myname)) ++ ".tex")))
                            myprint (mathTransform l)
                            return sz)
@@ -528,9 +547,9 @@ makeformulas p tempdir ll
                              ("\\documentclass{article}\n\\usepackage{color}\n\\input{./defaultcolors}\n\\usepackage{amsfonts}\n\\usepackage{amsmath}\n\\begin{document}\n\\thispagestyle{empty}\n$"
                                 ++ (mathTransform l) ++ "$\n\\end{document}")
                            Static.writeFiles tempdir headerFiles
-                           mysystem ("latex2png " ++ (tempdir </> (myname ++ ".tex")))
+                           _<-system ("latex2png " ++ (tempdir </> (myname ++ ".tex")))
                            sz <- mysize (tempdir </> (myname ++ ".png"))
-                           mysystem
+                           _<-system
                              ("latex2png -c -d 1200 " ++ (tempdir </> (((myname)) ++ ".tex")))
                            myprint (mathTransform l)
                            return sz)
@@ -572,6 +591,26 @@ jjoin theBody listOfFiguers
 tabgo :: [Int] -> [ByteString] -> [[ByteString]]
 tabgo (x:xs) bs = (take x bs):(tabgo xs (drop x bs))
 tabgo [] _ = []
+
+forkFinally2 :: IO a -> (Either SomeException a -> IO ()) -> IO ThreadId
+forkFinally2 action and_then =
+  mask $ \restore ->
+    forkOS $ try (restore action) >>= and_then       
+forker:: IO ()->[MVar Bool]->IO ()
+forker w (x:xs) = do b <- readMVar x
+                     if b then (swapMVar x False) >>(forkFinally2 w  (\_->swapMVar x True >>return ()))>>return () else forker w xs
+forker _ _ = error "Error forking subprocess"
+                      
+waiter::[IO ()]->[MVar Bool]->IO ()
+waiter work  l = do threadDelay 1000
+                    ll<-mapM readMVar l
+                    if or ll 
+                      then  case work of
+                                 (w:ws) -> do forker w l
+                                              waiter ws l
+                                 _ -> if and ll then return () else waiter work l 
+                      else waiter work l
+
 
 all :: FullConfig -> ImperativeMonad ()
 all cfg
@@ -632,24 +671,29 @@ all cfg
        let joined = jjoin (body result) ""
        let theConfig
              = LatexConfig{content = joined, figures = [],
-                           All.title = (makeTitle result purl), fullConfig = cfg,
-                           All.hostname = (UrlAnalyse.hostname purl), theResult = result,
+                           ltitle = (makeTitle result purl), fullConfig = cfg,
+                           lhostname = (UrlAnalyse.hostname purl), theResult = result,
                            onlyTables = True, lang = language, theTempDir = tempdir,
-                           formulas = theFormulas, figHTML = "", theHtmlTables=[], theHtmlMapes=[]} 
+                           formulas = theFormulas, figHTML = "", theHtmlTables=[], theHtmlMapes=[], theHtmlColours= Map.empty} 
        liftIO $ myprint " precompiling table columns"
        let cols = (sum (map Data.List.length (tablelist result)))
-       ior <- liftIO (newIORef (0 :: Integer))
        liftIO
          (myprint (" number of columns to be compiled: " ++ (show cols)))
-
-       ttabs <-          do liftIO (modifyIORef ior (+ 1))
-                            cc <- liftIO (readIORef ior)
-                            liftIO (myprint (" precompiling column number " ++ (show cc)))
-                            runLaTeX
-                              theConfig{content =
-                                          (toString (latexTableHeader)) ++
-                                            (intercalate "}\\the\\wd\\mybox{},\n\n\\let\\mybox\\undefined\\newsavebox{\\mybox}\\sbox{\\mybox}{" (concat (tablelist result))) ++"\n"++ (toString latexTableFooter)}
-       let tabs = tabgo (Prelude.map Data.List.length (tablelist result)) (Prelude.filter (Data.ByteString.Char8.any (=='.')) (Data.ByteString.split (Prelude.head (Data.ByteString.unpack  (Data.ByteString.Char8.singleton ','))) (Data.ByteString.pack (Prelude.filter (not . Data.Word8.isSpace) (Data.ByteString.unpack ttabs)))))
+       let chunks = (chunksOf 100 (Data.List.concat $ (tablelist result)))::[[String]]
+       mvars<-liftIO ((mapM (\_->newEmptyMVar) chunks))
+       let work= map (\(chun,cc,m)-> do myprint (" precompiling column number " ++ (show (1+100*(cc-1))))
+                                        r<-runLaTeXIOAction
+                                                     theConfig{content =
+                                                       (toString (latexTableHeader)) ++
+                                                         (intercalate "}\\the\\wd\\mybox{},\n\n\\let\\mybox\\undefined\\newsavebox{\\mybox}\\sbox{\\mybox}{"  chun) ++"\n"++ (toString latexTableFooter)} (show cc)
+                                        putMVar m r
+                                        ) (zip3 chunks ([1..]::[Integer]) mvars)
+                                        
+       np<-liftIO getNumProcessors
+       cores<-liftIO (mapM (\_->newMVar True) ([1..np]::[Int]))
+       liftIO (waiter work cores)
+       ttabs<-liftIO (mapM takeMVar mvars)
+       let tabs = tabgo (Prelude.map Data.List.length (tablelist result)) (Prelude.filter (Data.ByteString.Char8.any (=='.')) (Data.ByteString.split (Prelude.head (Data.ByteString.unpack  (Data.ByteString.Char8.singleton ','))) (Data.ByteString.pack (Prelude.filter (not . Data.Word8.isSpace) (Data.ByteString.unpack (Data.ByteString.concat ttabs))))))
        liftIO $ myprint " generating LaTeX document"
        liftIO
          (myprint
@@ -676,7 +720,7 @@ all cfg
        pdf <- runLaTeX
                 theConfig{onlyTables = False, theResult = newResult,
                           content = newContent, figures = imageCredits,
-                          figHTML = pphtml ++ contribHTML ++ "</body></html>",theHtmlTables= (theHtmlTabs newResult),theHtmlMapes= (theHtmlMaps newResult) }
+                          figHTML = pphtml ++ contribHTML ++ "</body></html>",theHtmlTables= (theHtmlTabs newResult),theHtmlMapes= (theHtmlMaps newResult), theHtmlColours=(theHtmlColors newResult)  }
        liftIO (Data.ByteString.writeFile (outputFilename cfg) pdf)
        liftIO $ removeDirectoryRecursive tempdir
        liftIO $ myprint " finished"

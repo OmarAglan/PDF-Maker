@@ -1,3 +1,145 @@
+Version 8.26
+        *src
+        The database for automated font choices has been updated. The 
+        contributors of articles with more than 5000 edits are now
+        fully listed.
+Version 8.25
+        *src
+        Removed buggy compile time dependency on libghc-http-conduit-dev
+        and add libghc-http-client-tls-dev instead.
+Version 8.24
+        *src
+        Fixed a bug about infinite loops for tables with very many columns.
+        Chunk size for table column precompilation now increased to 100,
+        causing mediawiki2latex to run faster. Removing outdated pdftex
+        option when loading graphicx in latex code. Removing duplicate
+        article headings in English Wikipedia.
+Version 8.23
+        *src
+        Switching table rendering back form tabularray to longtable. Making
+        musical scores as well as timelines work. Allowing for maps directly
+        below root level in parse tree. Removing table rows with style
+        attribute display:none from output.
+Version 8.22
+        *src
+        Removing an infinite loop when processing image maps. Fixing 
+        improper % escaping of umlauts
+Version 8.21
+        *src
+        Excluding div tags with style attribute display:none. Colored boxes
+        in map keys work properly now. Images inside tables rendered with 
+        chromium are properly attributed in the list of figures.
+Version 8.20
+        *src
+        Reactivating output of span tags in html generation. Removing 
+        figure and figurecaption output in html ouput to make position
+        maps work properly in chromium rendering. Fixing a bug about 
+        wrong table column width in LaTeX documents containing sturcetures
+        rendered with chromium. Making inner nested tables in LaTeX output
+        small enough not to exceed the size of the outer table.
+Version 8.19
+        *src
+        Allow for html character entites inside tables rendered with chromium.
+        cladograms work again. Subprocesses are now run without busy waiting 
+        for their results. Column precompilation now uses maximum number of 
+        available cpus. Tables containing a class attribute containing the
+        string wikitable are not rendered with rules in LaTeX. The 
+        fontsize parameter in the style tag of tables is now used to set
+        the fontsize inside tables. A bug causing wrong table column widths
+        in documents containing non-table-html-elements which are rendered
+        with chromium is now fixed.
+Version 8.18
+        *src
+        open street map wiki now works with standard template expansion.
+        inter language wiki links removed from output. Links to nonexistent 
+        users on Wikimedia commons work now. footnote in preamble of list
+        of figures now properly points to licenses chapter. added 
+        cc-by-sa austrian license to list of detectable licenses. Making
+        mediawiki2latex compile on latest Debian sid by adding import
+        of Control.Monad where needed.
+Version 8.17
+        *src
+        site title now included as first chapter heading in LaTeX
+        document. Footnotes inside captions of images now properly
+        numbered. page internal references now work in HTML mode.
+Version 8.16
+        *src
+        making footnotes in list of figures work again. Making links
+        pointing to wikimedia commons releativly point to wikimedia
+        commons absolutly. Links in wiki without protocol now translates
+        as links using the https protocol.
+Version 8.15
+        *src
+        solving bug about overwritten text in table of contents for large
+        books. making latex source zip file output work again.
+Version 8.14
+        *src
+        the downscaling of nested inner tables has been removed. Footnotes
+        inside tables work again.
+Version 8.13
+        *src
+        table columns are now precompiled in chunks 10 to reduce memory
+        consumption. html color 6 nibble hex codes work again. font 
+        changes are disabled for the spaceindented teletyper font 
+        environment. html named colors work again. made german wikibook
+        on pathology compile again
+Version 8.12
+        *src
+        all remaining compiler warnings have been fixed. named colors in
+        the background of tables cells now work again. fixed a bug about
+        the automatted determination of column width because of an 
+        incomplete transition to the tabularray package. fixed a compile
+        time bug about the visiblity of the toStrict funtion in the lazy
+        bytestring module.
+Version 8.11
+        *src
+        table rendering in LaTeX now done with the tabularry. Heavily
+        nested tables now rendered with chromium. Vertical and horzontal
+        lines in tables now display if rules=all given in html input.
+Version 8.10
+        *src
+        multicolumn cell in tables are now also considered when
+        calculating the column width of the tables automatically
+        tables of class wikitable zebra are now displayed with 
+        horizontal and vertical rules. A type has been fixed in the
+        web interface, developed instead of devolved. Line breaks 
+        are now also allowed before the pipe character. Exif tags are
+        now stripped from jpeg files to allow latex to process them
+        correctly. Html tables as well as html div tags which contain
+        position definitions are now rendered with chromium browser 
+        if tables rendering with chromium is requested by the user.
+        Tables with don't contain position definitions are rendered by
+        latex even if the user requests tables to be rendered by latex.
+Version 8.9
+        * src
+        tables with more then 10 columns now displayed more correctly.
+        relative smaller font by small html tag now possible inside
+        tables. font now larger inside tables with many columns.
+        cells with rowspan with a parameter of 1 now rendered as cells
+        with now rowspan at all. navboxes and infoboxes not shrinked
+        anymore. Inner nested tables now smaller. rules on sortable
+        wikitables now drawn. line break now allowed in front of any
+        bullet character. license "lizenz freie kunst" can now be
+        detected and will be referred to in the list of figures if found
+Version 8.8
+        * src
+        chars encoded with the single char html tag now correctly
+        trigger font changes if needed. lang parameter now allowed
+        in image references. poem tag added. poem inside tables
+        now allowed. formulas inside figure captions now allowed.
+        formulas inside image galleries work now. chromium rendering
+        now with --nosandbox parameter. Allow for images inside
+        captions of images, arbitrary nesting. hbar character now
+        works after changing inclusion order of the packages mathptmx
+        and amssymb in latex header. Allow for paragraph breaks 
+        outside image captions added license detection for licenses
+        cc-by-sa 2.0 German and cc-by 4.0. Disallowed space indented
+        verbatim environment inside tables. Adding templates English
+        wikibook on introduction to engineering chemistry. Added
+        templates for books on Minecraft Speedrunnning and Java.
+        Resolving a bug about attribute encoded plus sign in image
+        file URLs causing German Wikipedia Article on Berin to
+        compile correctly  
 Version 8.7
         * src
         images containing a question mark character work again

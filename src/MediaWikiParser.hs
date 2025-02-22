@@ -56,7 +56,7 @@ deepGetFigRes ::
         [Anything Char] -> [Anything Char]
 deepGetFigRes ll = concat $ map go ll
   where go (Environment Tag (TagAttr "img" m) _) = case Map.lookup "resource" m of
-                                                     Just x -> map C ("File"++ (dropWhile (/= ':') x))
+                                                     Just x -> map C (replace2 ("File"++ (dropWhile (/= ':') x)) "%2B" "+")
                                                      _ -> []
         go (Environment _ _ l) = (deepGetFigRes l)
         go _ = []
@@ -785,7 +785,7 @@ templateinsideverbatimp
                                                      "\"HaskellGHCi\",Visual Basic .NET: Vorlage:Code",
                                                      "C++-Programmierung/ Vorlage:Syntax", "syntax",
                                                      "Syntax", "C++-Programmierung/ Vorlage:Code",
-                                                     "BigJava", "LaTeX/Usage", "LaTeX/LaTeX",
+                                                     "BigJava", "LaTeX/Usage", "LaTeX/LaTeX","java","Java",
                                                      "Latex Index"]
                                                   then
                                                   do _ <- string "|"
@@ -914,11 +914,12 @@ wikiheadingp
                       case (a1 ++ a2 ++ a3 ++ a4 ++ a5 ++ a6) of
                           (_ : xs) -> return (Str xs)
                           [] -> pzero,
-               end =
-                 \ (Str x) ->
-                   do _ <- string x
-                      _ <- notFollowedBy (char '=')
-                      return (),
+               end = \y->
+                 case y of 
+                  (Str x) -> do _ <- string x
+                                _ <- notFollowedBy (char '=')
+                                return ()
+                  _ -> mzero,
                self = Wikiheading, allowed = everywherel2}
 
 {-DHUN| parses an italic text DHUN-}
@@ -1227,13 +1228,15 @@ prep
                       _ <- try (many (oneOf " \n")) <|> return []
                       _ <- char '>'
                       return (TagAttr p (Map.fromList atr)),
-               end =
-                 \ (TagAttr x _) ->
+               end = \y->
+                 case y of
+                  (TagAttr x _) ->
                    do _ <- char '<'
                       _ <- char '/'
                       _ <- string x
                       _ <- char '>'
-                      return (),
+                      return ()
+                  _ -> mzero,
                allowed = everywhere, self = Preformat}
 
 {-DHUN| Parses the HTML 'br' tag DHUN-}
@@ -1265,15 +1268,17 @@ maketagparser tags
                       _ <- try (many (oneOf " \n")) <|> return []
                       _ <- char '>'
                       return (TagAttr (t) (Map.fromList atr)),
-               end =
-                 \ (TagAttr x _) ->
+               end = \y-> 
+                case y of
+                  (TagAttr x _) ->
                    do _ <- char '<'
                       _ <- try (many (oneOf " ")) <|> return []
                       _ <- if x `elem` nonNestTags then try (char '/') <|> (return '/')
                              else (char '/')
                       _ <- string x
                       _ <- char '>'
-                      return (),
+                      return ()
+                  _ -> mzero,    
                allowed = SpaceIndent : everywheretbl, self = Tag}
 
 {-DHUN| Parser for the 'meta' and 'link' tag of HTML DHUN-}
@@ -1366,15 +1371,17 @@ makettagparser tags
                       _ <- try (many (oneOf " \n")) <|> return []
                       _ <- char '>'
                       return (TagAttr (t) (Map.fromList atr)),
-               end =
-                 \ (TagAttr x _) ->
+               end = \y->
+                case y of 
+                 (TagAttr x _) ->
                    do _ <- char '<'
                       _ <- try (many (oneOf " ")) <|> return []
                       _ <- if x `elem` nonNestTags then try (char '/') <|> (return '/')
                              else (char '/')
                       _ <- string x
                       _ <- char '>'
-                      return (),
+                      return ()
+                 _ -> mzero,     
                allowed = [Wikitable], self = Tag}
 
 {-DHUN| Returns a parser that matches all HTML elements, given by the list of strings given as first input parameter. The parser matches only the opening part of the tag. The inside of it is not processed by this parser. The opening tag may also self closing like <br/> because of the tailing /. Matches only inside tables DHUN-}
@@ -1699,12 +1706,14 @@ itemParserLevelTwo
                     z <- token show (\ _ -> pos)
                            (\ x -> if (itemStartString x == []) then Nothing else Just x)
                     return (Str (itemStartString z)),
-             end =
-               \ (Str y) ->
+             end = \z ->
+              case z of
+               (Str y) ->
                  do pos <- getPosition
                     _ <- token show (\ _ -> pos)
                            (\ x -> if (itemStopString x == y) then Just x else Nothing)
-                    return (),
+                    return ()
+               _->mzero,
              allowed = [Root, ItemEnv], self = ItemEnv, modify = \ _ x -> x,
              reenv = id}
 
@@ -1820,7 +1829,11 @@ itempgroupp
                       (do _ <- string "\n"
                           notFollowedBy ((oneOf ['*', ':', ';', '#'])))),
              allowed = [Root, Wikitable, TemplateInside, Tag], self = Itemgroup,
-             modify = \ (Str x) -> evaluateItemgroup x, reenv = id}
+             modify = \ z-> 
+                case z of 
+                  (Str x) -> evaluateItemgroup x
+                  _ -> id,
+             reenv = id}
 
 {-DHUN| a parser for a group of lines starting with one of *:;# representing in enumeration itemization etc. . This particular parser is only allowed to match within templates DHUN-}
 
@@ -1839,7 +1852,11 @@ itempgrouppt
                        (lookAhead (string "\n" >> (many (char ' ')) >> string "|")))
                     >> return ()),
              allowed = [TemplateInside], self = Itemgroup,
-             modify = \ (Str x) -> evaluateItemgroup x, reenv = id}
+             modify = \z->
+               case z of 
+                 (Str x) -> evaluateItemgroup x
+                 _ -> id,
+             reenv = id}
 
 {-DHUN| a parser for a preformat created by indenting with space DHUN-}
 
@@ -1847,10 +1864,10 @@ presectionp :: MyParser Char
 presectionp
   = MyParser{bad = \ _ -> try (string "}}") >> (return ()),
              start =
-               \ _ ->
-                 do _ <- string "\n"
-                    _ <- char ' '
-                    return (Str ""),
+               \stack -> do if TableTag `elem` (map environment stack) then mzero else return ()
+                            _ <- string "\n"
+                            _ <- char ' '
+                            return (Str ""),
              end =
                \ _ ->
                  lookAhead
@@ -1913,6 +1930,34 @@ kartopred m = case (Map.lookup "class" m) of
                 Just x -> isInfixOf "mw-kartographer-container" x
                 _ -> False
 
+
+printPrepareTree2 :: Bool->[Anything Char] -> [Anything Char]
+printPrepareTree2 vt ll =  printPrepareTree vt  ((getLemma ll)++(List.nub (getHead ll))++(getContent ll))
+
+
+getLemma :: [Anything Char] -> [Anything Char]
+getLemma ((Environment DhunUrl s l):_) = [Environment DhunUrl s l]
+getLemma ((Environment _ _ lll):xs)  = (getLemma lll)++(getLemma xs)
+getLemma (_:xs)  = getLemma xs
+getLemma []  = []
+
+
+getContent :: [Anything Char] -> [Anything Char]
+getContent ((Environment Tag (TagAttr "div" m) lll):_) | (check (Map.lookup "class" m)) = lll
+  where
+    check (Just s) = isInfixOf "mw-parser-output" s 
+    check _ = False
+getContent ((Environment _ _ lll):xs)  = (getContent lll)++(getContent xs)
+getContent (_:xs)  = getContent xs
+getContent []  = []
+getHead :: [Anything Char] -> [Anything Char]
+getHead ((Environment Tag (TagAttr "span" m) lll):_) | ((Map.lookup "class" m) == (Just "mw-page-title-main")) = [Environment Tag (TagAttr "h1" Map.empty) lll]
+getHead ((Environment _ _ lll):xs)  = (getHead lll)++(getHead xs)
+getHead (_:xs)  = getHead xs
+getHead []  = []
+
+
+
 printPrepareTree :: Bool->[Anything Char] -> [Anything Char]
 printPrepareTree vt ll = concat (map printPrepareNode ll)
   where printPrepareNode :: Anything Char -> [Anything Char]
@@ -1965,7 +2010,9 @@ printPrepareTree vt ll = concat (map printPrepareNode ll)
                (Map.lookup "id" m) == (Just "mw-panel-toc-list"))
             = []
             
-            
+        printPrepareNode (Environment TableRowSep (TagAttr "tr" m) _)
+          | (Map.lookup "style" m) == (Just "display:none;") 
+            = []            
         printPrepareNode (Environment Tag (TagAttr "a" m) _)
           | (Map.lookup "class" m) == (Just "mw-logo") 
             = []
@@ -2087,6 +2134,9 @@ printPrepareTree vt ll = concat (map printPrepareNode ll)
         printPrepareNode (Environment Tag (TagAttr "div" m) _)
           | (Map.lookup "style" m) == (Just "display:none") 
             = []
+        printPrepareNode (Environment Tag (TagAttr "div" m) _)
+          | (Map.lookup "class" m) == (Just "LanguageBar") 
+            = []
             
         printPrepareNode (Environment Tag (TagAttr "button" _) _) 
            = []
@@ -2110,6 +2160,8 @@ printPrepareTree vt ll = concat (map printPrepareNode ll)
           | (Map.lookup "id" m) == (Just "contentSub") = []
         printPrepareNode (Environment Tag (TagAttr "span" m) _)
           | (Map.lookup "style" m) == (Just "display:none") = []
+        printPrepareNode (Environment Tag (TagAttr "span" m) _)
+          | (Map.lookup "class" m) == (Just "error") = []
         printPrepareNode (Environment Tag (TagAttr "div" m) _)
           | (Map.lookup "class" m) == (Just "printfooter") = []
 
@@ -2172,6 +2224,9 @@ printPrepareTree vt ll = concat (map printPrepareNode ll)
           | (Map.lookup "id" m) == (Just "mw-navigation") = []   
         printPrepareNode (Environment Tag (TagAttr "div" m) _)
           | (Map.lookup "id" m) == (Just "mw-panel") = []
+        printPrepareNode (Environment Tag (TagAttr "script" _) _) = []           
+          
+
         printPrepareNode (Environment Tag (TagAttr "ul" m) _)
           | (Map.lookup "id" m) == (Just "footer-places") = []
         printPrepareNode (Environment Tag (TagAttr "ul" m) _)
@@ -2181,10 +2236,10 @@ printPrepareTree vt ll = concat (map printPrepareNode ll)
         printPrepareNode (Environment Tag (TagAttr "figure" _) l)
           = case 
               (do (l3,m3) <- case deepGet "a" "class" "mw-file-description" l of
-                            [Environment Tag (TagAttr "a" m2) l2] -> return (l2,m2)
+                            ((Environment Tag (TagAttr "a" m2) l2):_) -> return (l2,m2)
                             _-> mzero
                   llll <- case deepGetFigCaption l of
-                            [Environment Tag (TagAttr _ _) lll] -> return lll
+                            ((Environment Tag (TagAttr _ _) lll):_) -> return lll
                             _-> mzero
                   return $ imgfun m3 (printPrepareTree vt l3) (Just (printPrepareTree vt llll)))
              of 
@@ -2193,7 +2248,7 @@ printPrepareTree vt ll = concat (map printPrepareNode ll)
                              llll <- case deepGetFigCaption l of
                                         [Environment Tag (TagAttr _ _) lll] -> return lll
                                         _-> mzero
-                             return $ [Environment Wikilink (Str "") (res ++[C '|']++ llll)])
+                             return $ [Environment Wikilink (Str "") (res ++[C '|']++ (printPrepareTree vt llll))])
                      of 
                       Just x -> x
                       _-> printPrepareTree vt l
@@ -2222,7 +2277,14 @@ printPrepareTree vt ll = concat (map printPrepareNode ll)
                                                                          "&gt;"
                                                                          ">"))]
                 _ -> []
+        printPrepareNode (Environment Tag (TagAttr "h1" _) l) = [(Environment Wikiheading (Str "=") l)]
+        printPrepareNode (Environment Tag (TagAttr "h2" _) l) = [(Environment Wikiheading (Str "==") l)]
+        printPrepareNode (Environment Tag (TagAttr "h3" _) l) = [(Environment Wikiheading (Str "===") l)]
+        printPrepareNode (Environment Tag (TagAttr "h4" _) l) = [(Environment Wikiheading (Str "====") l)]
+        printPrepareNode (Environment Tag (TagAttr "h5" _) l) = [(Environment Wikiheading (Str "=====") l)]
+        printPrepareNode (Environment Tag (TagAttr "h6" _) l) = [(Environment Wikiheading (Str "======") l)]
         printPrepareNode (Environment Tag (TagAttr "img" m) l)
+        
           | (Map.lookup "class" m) `elem`
               (map Just
                  ["tex", "mwe-math-fallback-png-inline tex",
@@ -2270,7 +2332,7 @@ printPrepareTree vt ll = concat (map printPrepareNode ll)
         imgfun m l tt
           = maybeToList $
               do t <- case
-                        (fmap (parseit imgparsers) (Map.lookup "title" m)) `mplus` tt of
+                        tt `mplus` (fmap (parseit imgparsers) (Map.lookup "title" m))  of
                           Just x -> return $ [C '|'] ++ x
                           Nothing -> return []
                  h <- case filter (mypred "img") l of

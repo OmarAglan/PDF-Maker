@@ -590,6 +590,8 @@ listOfTags = goodtags1 ++ (map (map toUpper) goodtags1)
 {-DHUN| Character escaping from Unicode to latex DHUN-}
 
 chartrans :: Char -> String
+chartrans '•' = "\\allowbreak{}•"
+chartrans '|' = "\\allowbreak{}|"
 chartrans '\'' = "\\textquotesingle{}"
 chartrans '[' = "{$\\text{[}$}"
 chartrans ']' = "{$\\text{]}$}"

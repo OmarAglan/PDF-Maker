@@ -122,18 +122,8 @@ simpleContributors theLemma theHost uu st
                                                                                                   _ -> []
                                                                       _ -> []
                       _ -> [])
-       xx <- geturl theUrl
        let y = decodeString yy
-       let x = decodeString xx
-       let ff= (force (parseHtmlFast x))
-       let dd
-             = (((deepGet "a" "class" "new mw-userlink" ff)
-                  ++ (deepGet "a" "class" "mw-userlink" ff)))
-                 :: [Anything Char]
-
-       let ll = (filter pre (map go dd))
-       let n = (nub ll) :: [(String, String)]
-       let out = map go2 (zip (map (count ll) n) n)
+       out <- getCtrbFromUrl theUrl
        let ht = (parseHtmlFast y)
        case (getAuthor ht) of
            Just zz -> return
@@ -147,7 +137,29 @@ simpleContributors theLemma theHost uu st
           = ((shallowFlatten (deepFlatten l)), findWithDefault "" "href" m)
         go _ = ("", "")
         go2 (c, (a, h)) = (a, h, c, Nothing)
-
+        getCtrbFromUrl::String->IO [(String, String, Int, Maybe String)]
+        getCtrbFromUrl theUrl = 
+          do xx <- geturl theUrl
+             let x = decodeString xx
+             let ff = (force (parseHtmlFast x))
+             let dd = (((deepGet "a" "class" "new mw-userlink" ff)
+                        ++ (deepGet "a" "class" "mw-userlink" ff))) :: [Anything Char]
+             let ll = (filter pre (map go dd))
+             let n = (nub ll) :: [(String, String)]
+             let nextlink = nub (deepGet "a" "class" "mw-nextlink" ff)
+             next<-case nextlink of
+                       [Environment Tag (TagAttr _ m) _]-> case findWithDefault "" "href" m of
+                                                             ""->return []
+                                                             nexturl -> getCtrbFromUrl ("https://"
+                                                                                                             ++
+                                                                                                             theHost
+                                                                                                               ++
+                                                                                                               (replace2
+                                                                                                                  nexturl
+                                                                                                                  "&amp;"
+                                                                                                                  "&"))
+                       _ -> return []
+             return ((map go2 (zip (map (count ll) n) n))++next)
 
 count :: (Eq a) => [a] -> a -> Int
 count l s = length (filter (== s) l)
