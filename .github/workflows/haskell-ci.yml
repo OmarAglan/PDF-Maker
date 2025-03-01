@@ -1,0 +1,65 @@
+name: Haskell CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-with-cabal:
+    name: Build with Cabal
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup Haskell
+      uses: haskell-actions/setup@v2
+      with:
+        ghc-version: '9.2.8'
+        cabal-version: '3.6'
+
+    - name: Cache Cabal store
+      uses: actions/cache@v3
+      with:
+        path: ~/.cabal/store
+        key: ${{ runner.os }}-cabal-${{ hashFiles('**/*.cabal') }}
+        restore-keys: |
+          ${{ runner.os }}-cabal-
+
+    - name: Install dependencies
+      run: |
+        cabal update
+        cabal build --only-dependencies --enable-tests
+
+    - name: Build
+      run: cabal build
+
+  build-with-stack:
+    name: Build with Stack
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup Haskell Stack
+      uses: haskell-actions/setup@v2
+      with:
+        enable-stack: true
+        stack-version: 'latest'
+
+    - name: Cache Stack work directory
+      uses: actions/cache@v3
+      with:
+        path: ~/.stack-work
+        key: ${{ runner.os }}-stack-work-${{ hashFiles('stack.yaml') }}-${{ hashFiles('package.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-stack-work-
+
+    - name: Install dependencies
+      run: stack setup
+
+    - name: Build
+      run: stack build
+
+    - name: Run tests
+      run: stack test 

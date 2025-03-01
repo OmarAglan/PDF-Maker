@@ -1,0 +1,13 @@
+version: '3'
+
+services:
+  pdfmaker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./output:/data
+    ports:
+      - "8000:8000"  # For server mode
+    # Default command will be overridden when running the container
+    # Example: docker-compose run pdfmaker http://en.wikibooks.org/wiki/Haskell 

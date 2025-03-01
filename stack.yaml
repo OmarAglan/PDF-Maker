@@ -1,0 +1,30 @@
+# stack.yaml for PDF-Maker (MediaWiki to LaTeX)
+# This file was generated based on the existing cabal file
+
+resolver: lts-20.26  # Using a recent LTS resolver that supports GHC 9.2.8
+
+packages:
+- .
+
+extra-deps:
+- url-2.1.3
+- hxt-9.3.1.22
+- happstack-server-7.7.2
+- cereal-0.5.8.3
+- network-uri-2.6.4.2
+- hashable-1.4.3.0
+- time-1.12.2
+- directory-tree-0.12.1
+
+# Allow a newer minor version of GHC than the snapshot specifies
+# compiler-check: newer-minor
+
+# Configure Stack to use local system programs (e.g., LaTeX)
+system-ghc: false
+
+# Control whether to build with certain flags
+flags: {}
+
+# Control whether to use certain optimizations
+ghc-options:
+  "$everything": -O2 
