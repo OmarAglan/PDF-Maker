@@ -33,6 +33,7 @@ data EnvType = Wikilink
              | Chapter
              | Gallery
              | NoWiki
+             | MuInsideMath
              | HDevLine
              | NoInclude
              | PageBreak

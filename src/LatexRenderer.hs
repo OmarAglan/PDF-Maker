@@ -7,7 +7,7 @@ module LatexRenderer
         initialUrlState, makeLables, templateRegistry, baseUrl,
         deepFlatten, wikiLinkCaption, imageSize, isCaption, linewidth,
         generateGalleryImageNumbers, splitToTuples, galleryTableScale,
-        tempProcAdapter, treeToHtml3, tabletoodeep)
+        tempProcAdapter, treeToHtml3, tabletoodeep, mathTransform)
        where
 import Data.String.HT (trim)
 import Data.List
@@ -36,8 +36,26 @@ import Babel
 import Data.List.Split
 import Data.Hashable
 import Hex
-
+import qualified Data.Set as Set
 type HtmlRenderer = State MyState
+
+
+mathTreeToLaTeX :: [Anything Char] -> String
+mathTreeToLaTeX ll = concat (map mathNodeToLaTeX ll)
+  where
+    mathNodeToLaTeX (C x) = [x]
+    mathNodeToLaTeX (Environment MuInsideMath (Str f) _) = case reads f of 
+                                                                 [(y,_)]->"\\\\["++(printf "%0.5f" ((y::Float)/18.0))++"em]"
+                                                                 _-> "\\\\["++f++"mu]"
+
+    mathNodeToLaTeX _ = []
+
+{-DHUN| converts a mathematical expression (that is something within a math tag in the wiki) to an latex expression. Essentially the wiki is using latex. But it allows for some extra features that are take care of in this transformation DHUN-}
+
+mathTransform :: [Anything Char] -> String
+mathTransform x
+  = mathTreeToLaTeX (parseit [muinsidemathp] (multireplace (replace '\n' ' ' (shallowFlatten x)) replist))
+
 
 templateToHtml :: [Anything Char] -> String -> Renderer String
 templateToHtml l s
@@ -273,11 +291,11 @@ treeToHtml3 ::
 treeToHtml3 formulas mylanguage title l st
   = let (a, b)
           = runState (treeToHtml2 l) st{langu = mylanguage, forms = formulas}
-      in
+      in let (aa,_) =runState (treeToHtml2 (styles st)) st in
       ("<html><head><meta charset=\"utf-8\"><title>" ++
          title ++
-           "</title><style>table.sourceCode, tr.sourceCode, td.lineNumbers, td.sourceCode {  margin: 0; padding: 0; vertical-align: baseline; border: none; }\ntable.sourceCode { width: 100%; line-height: 100%; }\ntd.lineNumbers { text-align: right; padding-right: 4px; padding-left: 4px; }\ntd.sourceCode { padding-left: 5px; }\ncode > span.kw { font-weight: bold; }\ncode > span.dt { text-decoration: underline; }\ncode > span.co { font-style: italic; }\ncode > span.al { font-weight: bold; }\ncode > span.er { font-weight: bold; }\n@page {\n    size: 7in 100in;\n    margin: 0mm 0mm 0mm 0mm;\n}</style></head><body>"
-             ++ a,       b)
+           "</title><style>table.sourceCode, tr.sourceCode, td.lineNumbers, td.sourceCode {  margin: 0; padding: 0; vertical-align: baseline; border: none; }\ntable.sourceCode { width: 100%; line-height: 100%; }\ntd.lineNumbers { text-align: right; padding-right: 4px; padding-left: 4px; }\ntd.sourceCode { padding-left: 5px; }\ncode > span.kw { font-weight: bold; }\ncode > span.dt { text-decoration: underline; }\ncode > span.co { font-style: italic; }\ncode > span.al { font-weight: bold; }\ncode > span.er { font-weight: bold; }\n@page {\n    size: 7in 100in;\n    margin: 0mm 0mm 0mm 0mm;\n}</style></head><body><div class=\"mw-content-ltr mw-parser-output\" lang=\"de\" dir=\"ltr\">"
+            ++ aa ++ a,       b)
 
 treeToHtml :: [Anything Char] -> MyState -> String
 treeToHtml l states = (fst $ runState (treeToHtml2 l) states)
@@ -598,7 +616,7 @@ tableContentToLaTeX ((Environment TableColSep _ l) : xs)
            (headendsym (lastCellWasHeaderCell st)) ++
              (multiColumnEndSymbol (lastCellWasMultiColumn st)) ++
                (multiRowEndSymbol (lastCellWasMultiRow st)) ++
-                 (columnSeperator (lastCellWasNotFirstCellOfRow st)) ++ colsym ++
+                 (columnSeperator (lastCellWasNotFirstCellOfRow st)) ++ 
                    (multiRowSymbol (currentColumn st) (multiRowMap st)
                       (seperatingLinesRequestedForTable st)) ++
                                      --       (show (multiRowMap st))++"["++(show (currentColumn st)++"]")++"!"++(show cc)++","++ (show c)++"!"++
@@ -610,7 +628,7 @@ tableContentToLaTeX ((Environment TableColSep _ l) : xs)
                        ++
                        (multiRowStartSymbol l (activeColumn st) outerstate) ++
                          (if rig then "\\RaggedLeft{}" else "") ++
-                           hypennothing ++ (varwidthbegin st) ++ xx
+                           colsym ++ hypennothing ++ (varwidthbegin st) ++ xx
   where rig
           = isInfixOf2
               [Environment Attribute (Attr ("style", "text-align:right")) []]
@@ -645,7 +663,7 @@ tableContentToLaTeX ((Environment TableHeadColSep _ l) : xs)
            (headendsym (lastCellWasHeaderCell st)) ++
              (multiColumnEndSymbol (lastCellWasMultiColumn st)) ++
                (multiRowEndSymbol (lastCellWasMultiRow st)) ++
-                 (columnSeperator (lastCellWasNotFirstCellOfRow st)) ++ colsym ++
+                 (columnSeperator (lastCellWasNotFirstCellOfRow st)) ++ 
                    (multiRowSymbol (currentColumn st) (multiRowMap st)
                       (seperatingLinesRequestedForTable st))
                      ++
@@ -655,7 +673,7 @@ tableContentToLaTeX ((Environment TableHeadColSep _ l) : xs)
                        ++
                        (multiRowStartSymbol l (activeColumn st) outerstate) ++
                          headstartsym ++
-                           hypennothing ++ (varwidthbegin st) ++ xx
+                           colsym ++ hypennothing ++ (varwidthbegin st) ++ xx
 tableContentToLaTeX (x : xs)
   = do st <- get
        ele <- case (activeColumn st) of
@@ -703,18 +721,21 @@ hypennothing = "\\hspace*{0pt}\\ignorespaces{}\\hspace*{0pt}"
 tablecolorsym :: [Anything Char] -> (StateT TableState (State MyState) String)
 tablecolorsym ll
   = case genLookup "bgcolor" ll of
-        Just x -> case remh x of
-                       ys -> let (p, _, col) = colinfo ('l' : 'l' : ys) in
-                                      if p then do st<-lift get
-                                                   lift (put st{htmlColors=Map.insert (s col) col (htmlColors st)})
-                                                   return ("\\SetCell{bg=" ++  (s col)++"}") 
-                                           else return ("\\SetCell{bg=" ++ x ++ "}")
-        Nothing -> return ""
+        Just x -> getcol x
+        Nothing -> case genLookup "style" ll of 
+          Just y -> case lookup "background-color" (stylelist y) of 
+            Just z -> getcol z
+            Nothing -> return ""
+          Nothing -> return ""
  where 
-   s c="c" ++ (filter (\x->not (x `elem` "}{,")) c)
-   remh x = case x of 
-             ('#' : ys)->ys
-             ys ->ys
+   getcol x = case x of
+                      ('#' : ys) -> let (p, colname, col) = colinfo ('l' : 'l' : ys) in
+                                      if p then return ("\\cellcolor[rgb]" ++ col) else
+                                        return ("\\cellcolor{" ++ colname ++ "}")
+                      _ -> return ("\\cellcolor{" ++ x ++ "}")
+   stylelist y =  concat (map (go.(splitOn ":")) (splitOn ";" y))     
+   go [a,b] =[(strip " \n\r\t" a,strip " \n\r\t"  b)]
+   go _ = []
 {-DHUN| the caption of a table is given in |+ or <th> elements, it needs to be reformatted in the parse in oder to be rendered in latex as a multicolumn cell spanning the whole width of the table DHUN-}
 
 reformatTableCaption ::
@@ -1162,13 +1183,13 @@ killnl2 [] = []
 {-DHUN| returns the caption of a link. A link is represented as [foobar.com mycaption] in wiki notation. It takes the parse tree representation of the link as first input parameter. The second input parameter is the current state of the renderer. The third parameter is the Uri scheme as string (See 'URI scheme' in the English wikipeda) usually this is 'http'. It returns the latex representation of the caption of the link as string DHUN-}
 
 linkCaption ::
-            [Anything Char] -> MyState -> String -> Bool -> String
-linkCaption l st s b
+            [Anything Char] -> String -> Bool -> Renderer String
+linkCaption l s b
   = case spl of
-        (_ : (gg : gs)) -> (treeToLaTeX
+        (_ : (gg : gs)) -> (treeToLaTeX2
                               (concat (gg : (map (\ x -> (C ' ') : x) gs)))
-                              st)
-        _ -> if b then "" else s ++ (escapelink (linkLocation l))
+                              )
+        _ -> if b then return "" else return $ s ++ (escapelink (linkLocation l))
   where spl = splitOn [C ' '] l
 
 {-DHUN| returns the latex representation of a link. A link is represented as [foobar.com mycaption] in wiki notation. It takes the parse tree representation of the link as first input parameter. The second input parameter is the current state of the renderer. The third parameter is the Uri scheme as string (See 'URI scheme' in the English wikipeda) usually this is 'http'. It returns the latex representation of the link as string DHUN-}
@@ -1181,17 +1202,17 @@ linkToLaTeX l s st
 linkToLaTeX2 :: [Anything Char] -> String -> Renderer String
 linkToLaTeX2 l s
   = do st<-get
-       if  ((b st) && (cap st) == "") || ((cap st) == (s ++ (escapelink (linkLocation l))))
+       cap <-(linkCaption l s (b st))
+       if  ((b st) && cap == "") || (cap == (s ++ (escapelink (linkLocation l))))
         then return $ "\\myplainurl{" ++ s ++ (escapelink (linkLocation l)) ++ "}"
         else
          if addit st=="" then
-         makeFootNoteRef "h"  (s++(escapelink (linkLocation l))) (cap st)
+         makeFootNoteRef "h"  (s++(escapelink (linkLocation l))) cap
          else return $ "\\my" ++
                           (addit st) ++
-                            "href{" ++ s ++ (escapelink (linkLocation l)) ++ "}{" ++ (cap st) ++ "}"
+                            "href{" ++ s ++ (escapelink (linkLocation l)) ++ "}{" ++ cap ++ "}"
   where addit st = if (b st) then "fn" else ""
         b st = getInFootnote st
-        cap st = (linkCaption l st s (b st))
 {-DHUN| takes a list and splits it into sublist of equal length, allowing a possible smaller length for the last list in case the devision does not create an integer result. DHUN-}
 
 splitToTuples :: [a] -> [[a]]
@@ -3064,9 +3085,7 @@ treeToLaTeX2 ll
                    wikiLinkToLaTeX2 l
         nodeToLaTeX (Environment Link (Str s) l)
           = do st <- get
-               if getInHeading st then
-                 return $ linkCaption l st s (getInFootnote st) else
-                 linkToLaTeX2 l s
+               if getInHeading st then linkCaption l s (getInFootnote st) else linkToLaTeX2 l s
         nodeToLaTeX (Environment Link2 (Str s) l)
           = nodeToLaTeX (Environment Link (Str s) l)
         nodeToLaTeX (Environment ItemEnv (Str _) [Item _]) = return []
@@ -3316,12 +3335,12 @@ treeToLaTeX2 ll
                                                                                                  else
                                                                                                  "\\colorlet{shadecolor}{"
                                                                                                    ++
-                                                                                                   (if z1=="" then "grey" else z1)
+                                                                                                   (if not (Set.member z1 htmlColorNames) then "grey" else z1)
                                                                                                      ++
                                                                                                      "}"
                                                                              _ -> Just $
                                                                                     "\\colorlet{shadecolor}{"
-                                                                                      ++ (if z1=="" then "grey" else z1) ++ "}"
+                                                                                      ++ (if not (Set.member z1 htmlColorNames) then "grey" else z1) ++ "}"
                                                              _ -> Nothing
                                       _ -> Nothing
                 beg

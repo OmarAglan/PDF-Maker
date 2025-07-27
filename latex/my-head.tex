@@ -21,8 +21,16 @@
 \usepackage{xltxtra}
 \usepackage{fontspec}
 
-\setmainfont[Path=/usr/share/fonts/truetype/cmu/,UprightFont=cmunrm,BoldFont=cmunbx,ItalicFont=cmunti,BoldItalicFont=cmunbi]{cmunbx.ttf}
-\setmonofont[Path=/usr/share/fonts/truetype/cmu/,UprightFont=cmuntt,BoldFont=cmuntb,ItalicFont=cmunit,BoldItalicFont=cmuntx]{cmunbx.ttf}
+\directlua
+{luaotfload.add_fallback
+   ("myfallback",
+   {
+      "unifont:mode=harf;"
+   }
+   )
+} 
+\setmainfont[RawFeature={fallback=myfallback},Path=/usr/share/fonts/truetype/cmu/,UprightFont=cmunrm,BoldFont=cmunbx,ItalicFont=cmunti,BoldItalicFont=cmunbi]{cmunbx.ttf}
+\setmonofont[RawFeature={fallback=myfallback},Path=/usr/share/fonts/truetype/cmu/,UprightFont=cmuntt,BoldFont=cmuntb,ItalicFont=cmunit,BoldItalicFont=cmuntx]{cmunbx.ttf}
 
 \begin{document}
 \allowdisplaybreaks

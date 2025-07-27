@@ -40,14 +40,14 @@ fontsetter f
           = "{" ++
               filename ++
                 "}" ++
-                  "[" ++
+                  "[RawFeature={fallback=myfallback}," ++
                     (if os == "linux" then "Path=" ++ pathname else "") ++
                       (mid f) ++ "]"
         innermono
           = "{" ++
               filename ++
                 "}" ++
-                  "[" ++
+                  "[RawFeature={fallback=myfallback}," ++
                     (if os == "linux" then "Path=" ++ pathname else "") ++
                       (midmono f) ++ "]"
         mid i

@@ -229,11 +229,6 @@ multireplace haystack ((needle, nail) : xs)
   = multireplace (replace2 haystack needle nail) xs
 multireplace haystack [] = haystack
 
-{-DHUN| converts a mathematical expression (that is something within a math tag in the wiki) to an latex expression. Essentially the wiki is using latex. But it allows for some extra features that are take care of in this transformation DHUN-}
-
-mathTransform :: [Anything Char] -> String
-mathTransform x
-  = multireplace (replace '\n' ' ' (shallowFlatten x)) replist
 
 {-DHUN| list of replacements to be applied to contents of math tags in wiki notation for use in the latex equation environment DHUN-}
 

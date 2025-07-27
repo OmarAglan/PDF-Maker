@@ -1,3 +1,19 @@
+Version 8.28
+        *src
+        Gnu Unifont is now used as fallback font everywhere. Nested
+        structures of images inside image captions a now flattened. Table
+        cells can now have colored background. Removing content is style
+        tag with display: none; attribute. Math formulas in Wikipedia
+        articles works again.
+Version 8.27
+        *src
+        Space characters in URLs are now encoded as underscores.
+        Style tags are now passed trough from the HTML input to
+        the chromium browser for rendering complex structures.
+        If an invalid HTML color name is requested it is replaced
+        by grey. Fonts are now correctly switched even inside links.
+        In line breaks in math mode the uni mu is converted to the unit
+        em with a conversion factor of 1/18.
 Version 8.26
         *src
         The database for automated font choices has been updated. The 

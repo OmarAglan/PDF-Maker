@@ -82,14 +82,14 @@ compile theRunMode text templates tabs mytitle mylanguage fformulas
   = do st <- get
        case theRunMode of
            StandardTemplates No -> return
-                                     (run b mylanguage mytitle (parseit parsers text)
+                                     (run (getStyles (parseit parsers text)) b mylanguage mytitle (parseit parsers text)
                                        (parseit parsers text)
                                        (hostname . fullUrl $ st)
                                        templates
                                        tabs
                                        fformulas (vectorr st) llang latexTabels)
            UserTemplateFile No _ -> return
-                                      (run b mylanguage mytitle (parseit parsers text)
+                                      (run (getStyles (parseit parsers text)) b mylanguage mytitle (parseit parsers text)
                                         (parseit parsers text)
                                         (hostname . fullUrl $ st)
                                         templates
@@ -97,7 +97,7 @@ compile theRunMode text templates tabs mytitle mylanguage fformulas
                                         fformulas (vectorr st) llang latexTabels)
            HTML No  -> do --liftIO (Tools.writeFile "/home/dirk/dhudhu" (show (printPrepareTree2 (not latexTabels) (parseit minparsers text))))
                           return
-                           (run b mylanguage mytitle
+                           (run (getStyles (parseit minparsers text)) b mylanguage mytitle
                             (printPrepareTree2 (not latexTabels) (parseit minparsers text))
                             (printPrepareTree2 (not latexTabels) (parseit minparsers text))
                             (hostname . fullUrl $ st)
@@ -105,15 +105,21 @@ compile theRunMode text templates tabs mytitle mylanguage fformulas
                              tabs
                              fformulas (vectorr st) llang latexTabels)
            ExpandedTemplates No -> do return
-                                       (run b mylanguage mytitle (parseit parsers text)
+                                       (run (getStyles (parseit minparsers text)) b mylanguage mytitle (parseit parsers text)
                                         (parseit parsers text)
                                         (hostname . fullUrl $ st)
                                         templates
                                         tabs
                                         fformulas (vectorr st) llang latexTabels)
            _ -> do case loadacu st of 
-                       Right pt -> return  (run b mylanguage mytitle pt pt  (hostname . fullUrl $ st)   templates tabs  fformulas (vectorr st) llang latexTabels)
-                       Left pt -> (runcheap b mylanguage mytitle pt  (hostname . fullUrl $ st)   templates tabs  fformulas theRunMode latexTabels)
+                       Right pt -> return (run (getStyles pt) b mylanguage mytitle pt pt  (hostname . fullUrl $ st)   templates tabs  fformulas (vectorr st) llang latexTabels)
+                       Left pt -> do help <- case pt of 
+                                                  (x:_)->liftIO (B.readFile (x </> "output"))
+                                                  _->return empty
+                                     let hhelp = case (S.decode help) of
+                                           Right r -> r
+                                           _ -> []             
+                                     (runcheap (getStyles hhelp) b mylanguage mytitle pt  (hostname . fullUrl $ st)   templates tabs  fformulas theRunMode latexTabels)
 
 {-DHUN| pathname of the temporary directory of the compiler |DHUN-}
 
@@ -175,7 +181,7 @@ postproctabmap m = Map.map f m
 
 {-DHUN| the first parameter is the parse tree created by get parse of the document currently being processed. the second parameter is the URL under which the document was downloaded. the third parameter is the netloc describing the wiki this page belongs to. The fourth parameter is a mapping file defined by the user for the mapping of mediawiki templates to latex commands. the fifth parameter is a possible parse tree created by precious run the the should be added before the begging of the newly created parse tree. This function writes out all results to temporary files that will be further processed by compiler.py DHUN-}
 
-run ::
+run :: [Anything Char] ->
     Bool ->
       Maybe String ->
         String ->
@@ -183,14 +189,14 @@ run ::
             [Anything Char] ->
               String ->
                 String -> [[ByteString]] -> Map.Map String Int -> Bool ->Maybe String->Bool->CompileResult
-run bb mylanguage mytitle parsetree parsetree2 netloc tmpl
+run theStyles bb mylanguage mytitle parsetree parsetree2 netloc tmpl
   someTables fformulas vec llang latexTabels
   = CompileResult{images = img, body = bdy, tablelist = theTables,
                   galleryNumbers = gals, title = tit,
                   html = if bb then trda3 else [],theHtmlTabs =htmlTabs, theHtmlMaps=htmlMs, theHtmlColors= htmlCols}
   where alldata2 g u
           = (treeToLaTeX3 ((snd . newtree $ g))
-               initialState{urld = analyseNetloc netloc}{langu=llang, tabmap = u,
+               initialState{urld = analyseNetloc netloc}{styles=theStyles, langu=llang, tabmap = u,
                                                          templateMap =
                                                            getUserTemplateMap
                                                              (read tmpl :: [[String]])}{urls =
@@ -201,7 +207,7 @@ run bb mylanguage mytitle parsetree parsetree2 netloc tmpl
                                                                                             $ g, latexTabs=latexTabels})
         alldata3 g u
           = (treeToHtml3 fformulas mylanguage mytitle ((snd . newtree $ g))
-               initialState{urld = analyseNetloc netloc}{langu=llang,MyState.vector=vec, tabmap = u,
+               initialState{urld = analyseNetloc netloc}{styles=theStyles, langu=llang,MyState.vector=vec, tabmap = u,
                                                          templateMap =
                                                            getUserTemplateMap
                                                              (read tmpl :: [[String]])}{urls =
@@ -237,19 +243,19 @@ run bb mylanguage mytitle parsetree parsetree2 netloc tmpl
 
 
 runcheap ::
-    Bool ->
+    [Anything Char]->Bool ->
       Maybe String ->
         String ->
           [String] ->
               String ->
                 String -> [[ByteString]] -> Map.Map String Int -> RunMode ->Bool->ImperativeMonad CompileResult
-runcheap _ _ _ input netloc tmpl
+runcheap theStyles _ _ _ input netloc tmpl
   someTables _ theRunMode theLatexTables
   = do ntree<-labelit input
 
                           
 
-       trst<-ttl3 initialState{ latexTabs=theLatexTables,urld = analyseNetloc netloc}{tabmap = tm,
+       trst<-ttl3 initialState{ styles=theStyles,latexTabs=theLatexTables,urld = analyseNetloc netloc}{tabmap = tm,
                                                          templateMap =
                                                            getUserTemplateMap
                                                              (read tmpl :: [[String]])}{urls =

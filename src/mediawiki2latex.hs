@@ -223,7 +223,7 @@ header = "Usage: mediawiki2latex [OPTION...]"
 
 versionHeader :: String
 versionHeader
-  = "mediawiki2latex version 8.26\n" ++ (usageInfo header options)
+  = "mediawiki2latex version 8.28\n" ++ (usageInfo header options)
 
 {-DHUN| print the version string of mediawiki2latex. Takes the output of the compilerOpts function as input. Prints the version string if no options were given or the version command was given does noting otherwise DHUN-}
 

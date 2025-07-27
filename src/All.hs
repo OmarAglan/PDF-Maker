@@ -636,8 +636,6 @@ all cfg
        minInit
        liftIO $ myprint " downloading article and contributor information"
        text <- load cfg
-       
-
 
 
        liftIO $ myprint " parsing article text"

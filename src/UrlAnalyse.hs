@@ -26,6 +26,7 @@ import qualified Network.HTTP.Types.Version as V
 import Data.Serialize
 import GHC.Generics
 import Network.HTTP.Client.TLS
+import Tools (replace2)
 deriving instance Read URL.URL
 deriving instance Read URL.Host
 deriving instance Read URL.Protocol
@@ -126,8 +127,8 @@ geturl u
 
 
 geturl2 :: String -> IO BStr.ByteString
-geturl2 u
-  = if u=="" then return (BStr.pack []) else Control.Exception.catch
+geturl2 uuu
+  = let u = replace2 uuu "%20" "_"  in if u=="" then return (BStr.pack []) else Control.Exception.catch
       (do req1 <- parseRequest u
           let req0= req1{requestHeaders=(T.hUserAgent,UTF8Str.fromString "mediawiki2latex"): (requestHeaders req1)} 
           let req
@@ -246,8 +247,9 @@ myfun _ = return ()
 {-DHUN| gets the wiki source code of a lemma on a wiki. The first parameter is the lemma. So JohnDow for en.wikipedia/wiki/JohnDow. The second parameter is the wikiurl. A wikiurl specifies the wiki from which the data should be downloaded. See documentation on the type 'WikiUrl' for more information. Also see documentation on the function 'analyze' to see how to create a 'WikiUrl'. This function returns the wiki source code of the lemma as String it is wrapped in the IO monad since it does a http request it is also wrapped in the Maybe monad since it may not be able to retrieve the source. DHUN-}
  
 getpage :: String -> WikiUrl -> IO (Maybe String)
-getpage ss u
-  = do l <- mapM ((geturl4 ss ). unify . exportURL . modpath) (parses u)
+getpage sss u
+  = do let ss=replace2 sss " " "_"
+       l <- mapM ((geturl4 ss ). unify . exportURL . modpath) (parses u)
        ll <- mapM getTextContent2 l
        lll <- return (seq ll ll)
        return $
@@ -273,8 +275,9 @@ getBookpage ss u
 {-DHUN| Loads the wikitext of an article form a mediawiki server when mediawiki2latex is running with the --mediawiki option. This function downloads the orignial wikitext source without expanding the templates. This is going to happen later by call to getExpandedPage. The first parmeter is lemma to load. The second paramerter is the WikiUrl to the server hosting the wiki. The return value is a pair. The first element of it is the wikitext source of the article. The second element of it is the URL under which the article was downloaded DHUN-}
 
 getpage2 :: String -> WikiUrl -> IO (Maybe (String, URL))
-getpage2 ss u
-  = do l <- mapM ((geturl4 ss) . unify . exportURL . modpath) (parses u)
+getpage2 sss u
+  = do let ss=replace2 sss " " "_"
+       l <- mapM ((geturl4 ss) . unify . exportURL . modpath) (parses u)
        ll <- mapM getTextContent2 l
        lll <- return (seq ll ll)
        return $ (listToMaybe $ concat (map go (zip lll (parses u))))

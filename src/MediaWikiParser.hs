@@ -52,6 +52,22 @@ deepGetFigCaption ll = concat $ map go ll
         go (Environment _ _ l) = (deepGetFigCaption l)
         go _ = []
 
+
+deepKillFigure ::
+        [Anything a] -> [Anything a]
+deepKillFigure ll = concat $ map go ll
+  where go (Environment Tag (TagAttr "figure" _) _) =[]
+        go (Environment s m l) = [Environment s m (deepKillFigure l)]
+        go x = [x]
+
+deepGetFigure ::
+        [Anything a] -> [Anything a]
+deepGetFigure ll = concat $ map go ll
+  where go (Environment Tag (TagAttr "figure" m) l) =[Environment Tag (TagAttr "figure" m) l]
+        go (Environment _ _ l) = (deepGetFigure l)
+        go _ = []
+
+
 deepGetFigRes ::
         [Anything Char] -> [Anything Char]
 deepGetFigRes ll = concat $ map go ll
@@ -615,6 +631,19 @@ nowikip
                end = \ _ -> string "</nowiki>" >> return (),
                allowed = everywhere ++ wikilinkwhere ++ [SpaceIndent],
                self = NoWiki}
+
+{-DHUN| parses a linebreak with mu math units inside a math tag DHUN-}
+
+
+muinsidemathp :: MyParser Char
+muinsidemathp
+  = baseParser{start = \ _ -> do _<-string "\\\\[" 
+                                 f<-many (oneOf "0123456789.+-Ee")
+                                 _<-string "mu]"
+                                 return (Str f),
+               allowed = [Root],
+               self = MuInsideMath}
+
 
 {-DHUN| parses the mediawiki 'noinclude' tag DHUN-}
 
@@ -1934,6 +1963,12 @@ kartopred m = case (Map.lookup "class" m) of
 printPrepareTree2 :: Bool->[Anything Char] -> [Anything Char]
 printPrepareTree2 vt ll =  printPrepareTree vt  ((getLemma ll)++(List.nub (getHead ll))++(getContent ll))
 
+getStyles :: [Anything Char] -> [Anything Char]
+getStyles ((Environment Tag (TagAttr "style" m) lll):xs) = [(Environment Tag (TagAttr "style" m) lll)]++(getStyles xs)
+getStyles ((Environment _ _ lll):xs)  = (getStyles lll)++(getStyles xs)
+getStyles (_:xs)  = getStyles xs
+getStyles []  = []
+
 
 getLemma :: [Anything Char] -> [Anything Char]
 getLemma ((Environment DhunUrl s l):_) = [Environment DhunUrl s l]
@@ -2161,6 +2196,8 @@ printPrepareTree vt ll = concat (map printPrepareNode ll)
         printPrepareNode (Environment Tag (TagAttr "span" m) _)
           | (Map.lookup "style" m) == (Just "display:none") = []
         printPrepareNode (Environment Tag (TagAttr "span" m) _)
+          | (Map.lookup "style" m) == (Just "display: none;") = []  
+        printPrepareNode (Environment Tag (TagAttr "span" m) _)
           | (Map.lookup "class" m) == (Just "error") = []
         printPrepareNode (Environment Tag (TagAttr "div" m) _)
           | (Map.lookup "class" m) == (Just "printfooter") = []
@@ -2241,7 +2278,7 @@ printPrepareTree vt ll = concat (map printPrepareNode ll)
                   llll <- case deepGetFigCaption l of
                             ((Environment Tag (TagAttr _ _) lll):_) -> return lll
                             _-> mzero
-                  return $ imgfun m3 (printPrepareTree vt l3) (Just (printPrepareTree vt llll)))
+                  return $ (imgfun m3 (printPrepareTree vt l3) (Just (printPrepareTree vt (deepKillFigure llll))))++(printPrepareTree vt (deepGetFigure llll)))
              of 
                Just x -> x  
                _ -> case (do res <- Just (deepGetFigRes  l)
@@ -2283,12 +2320,8 @@ printPrepareTree vt ll = concat (map printPrepareNode ll)
         printPrepareNode (Environment Tag (TagAttr "h4" _) l) = [(Environment Wikiheading (Str "====") l)]
         printPrepareNode (Environment Tag (TagAttr "h5" _) l) = [(Environment Wikiheading (Str "=====") l)]
         printPrepareNode (Environment Tag (TagAttr "h6" _) l) = [(Environment Wikiheading (Str "======") l)]
-        printPrepareNode (Environment Tag (TagAttr "img" m) l)
-        
-          | (Map.lookup "class" m) `elem`
-              (map Just
-                 ["tex", "mwe-math-fallback-png-inline tex",
-                  "mwe-math-fallback-image-inline tex"])
+        printPrepareNode (Environment Tag (TagAttr "img" m) l)     
+          | go (Map.lookup "class" m) 
             =
             case Map.lookup "alt" m of
                 Just x -> [Environment Math (TagAttr "math" m)
@@ -2297,6 +2330,10 @@ printPrepareTree vt ll = concat (map printPrepareNode ll)
                                    ">"))]
                 Nothing -> [(Environment Tag (TagAttr "img" m)
                                (printPrepareTree vt l))]
+         where
+           go :: Maybe String-> Bool
+           go (Just x) = or (map (\y-> isInfixOf y x) ["tex", "mwe-math-fallback"])
+           go _ = False
         printPrepareNode (Environment Tag (TagAttr "div" m) l)
           = case
               do c <- Map.lookup "class" m
