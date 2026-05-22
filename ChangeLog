@@ -1,3 +1,29 @@
+Version 8.32
+        *src
+        Corrected references to literature in notes sections.
+Version 8.31
+        *src
+        Some superfluous functions removed and some type signature have been
+        improved. The documentation has been improved and now it covers
+        100 percent of the code according to the haddock documentation
+        facility.
+Version 8.30
+        *src
+        Some superfluous functions and data type elements have been removed.
+        The documentation has been improved. The maximum number of parallel
+        connection when downloading images has been removed to two to 
+        avoid infinite loops due to never ending downloads.
+Version 8.29
+        *src
+        The source code documentation has been significantly improved
+        by adding a large amount of comments where needed. Some superfluous
+        functions and record fields have been remove. Test cases have be
+        enabled and a command line option to run the tests has been added.
+        Some support for HTML tags which look like an opening XML tag but are
+        in fact directly self closing was added. The deprecated source tag
+        has been removed. Support for characters above the 16 bit Unicode 
+        range has been added using Gnu Unifont. The typesetting of chess
+        diagrams has been added. CJK fonts are vector fonts again.
 Version 8.28
         *src
         Gnu Unifont is now used as fallback font everywhere. Nested

@@ -20,6 +20,15 @@
 \usepackage{xltxtra}
 \usepackage{fontspec}
 \usepackage{varwidth}
+\directlua
+{luaotfload.add_fallback
+   ("myfallback",
+   {
+      "unifont:mode=harf;"
+   }
+   )
+} 
+
 \setmainfont[
  	UprightFont=FreeSerif,
  	BoldFont=FreeSerifBold,

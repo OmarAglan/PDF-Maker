@@ -7,6 +7,6 @@ dhunparserurl Benutzer:Dirk_Huenniger/play
 
 {{rot|Beispieltext}}
 
-{{grün|'''Beispieltext'''}}
+{{grün|Beispieltext}}
 
 {{bg|yellow|Beispieltext}}

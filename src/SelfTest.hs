@@ -1,4 +1,3 @@
-
 module SelfTest where
 
 runSelfTest :: Integer -> Integer -> IO ()

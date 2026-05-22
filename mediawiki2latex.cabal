@@ -1,5 +1,5 @@
 Name:           mediawiki2latex
-Version:        8.28
+Version:        8.32
 License:        GPL
 License-File:   LICENSE
 Author:         Dirk Hünniger <dirk.hunniger@googlemail.com>
@@ -18,7 +18,7 @@ Description:
 Stability:      Experimental
 Tested-With:    GHC==6.12.3
 Tested-With:    GHC==7.4.1
-Cabal-Version:  >=1.6
+Cabal-Version:  >=1.8
 Build-Type:     Simple
 extra-source-files:
   latex/coverfrontpage.tex
@@ -147,7 +147,8 @@ Executable mediawiki2latex
     network >= 2.3.0.13,
     tagsoup,
     http-client-tls,
-    word8
+    word8,
+    HUnit
 
   Other-Modules:
     All
@@ -161,7 +162,6 @@ Executable mediawiki2latex
     LatexRenderer
     Licenses
     Load
-    Logger
     MagicStrings
     MediaWikiParser
     MediaWikiParseTree
@@ -172,11 +172,13 @@ Executable mediawiki2latex
     SimpleContributors
     Static
     TableHelper
+    Test
     Tools
     UrlAnalyse
     WikiHelper
     WikiLinkHelper
     HtmlParser
+    Wiki2Fen
   GHC-Options:    -Wall -fno-warn-orphans -O2 -rtsopts "-with-rtsopts=-K1000M -N" -threaded -optl-Wl,-z,relro -optl-Wl,-z,now 
   Hs-Source-Dirs: src
   Main-Is: mediawiki2latex.hs
